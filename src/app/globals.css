@@ -1,0 +1,258 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  font-family: var(--font-outfit), sans-serif;
+  color: #111;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Comic card base ──────────────────────────────────── */
+.c-card {
+  background: #fff;
+  border: 3px solid #111;
+  border-radius: 20px;
+  box-shadow: 5px 5px 0 #111;
+}
+
+.c-card-lg {
+  background: #fff;
+  border: 4px solid #111;
+  border-radius: 24px;
+  box-shadow: 8px 8px 0 #111;
+}
+
+/* ── Comic button ─────────────────────────────────────── */
+.c-btn {
+  border: 3px solid #111;
+  border-radius: 14px;
+  box-shadow: 4px 4px 0 #111;
+  font-family: var(--font-outfit), sans-serif;
+  font-weight: 900;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 80ms, box-shadow 80ms;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.c-btn:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #111;
+}
+
+.c-btn:active {
+  transform: translate(3px, 3px);
+  box-shadow: 1px 1px 0 #111;
+}
+
+/* ── Comic input ──────────────────────────────────────── */
+.c-input {
+  background: #fff;
+  border: 3px solid #111;
+  border-radius: 14px;
+  padding: 0.65rem 1rem;
+  font-family: var(--font-outfit), sans-serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: #111;
+  outline: none;
+  width: 100%;
+  transition: box-shadow 0.12s;
+}
+
+.c-input::placeholder {
+  color: #bbb;
+  font-weight: 500;
+}
+
+.c-input:focus {
+  box-shadow: 0 0 0 3px #ffe66d;
+}
+
+/* ── Halftone printing overlay ────────────────────────── */
+.halftone {
+  background-image: radial-gradient(circle, rgba(0,0,0,0.055) 1px, transparent 1px);
+  background-size: 14px 14px;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════
+   BALLOON ANIMATIONS — Comic Edition
+   ══════════════════════════════════════════════════════ */
+
+/* ── Rise: floats up with a gentle side-drift ── */
+@keyframes balloon-rise {
+  0%   { transform: translateY(110vh) translateX(0px); }
+  20%  { transform: translateY(88vh)  translateX(6px);  }
+  40%  { transform: translateY(66vh)  translateX(-8px); }
+  60%  { transform: translateY(44vh)  translateX(4px);  }
+  80%  { transform: translateY(22vh)  translateX(-6px); }
+  100% { transform: translateY(-220px) translateX(0px); }
+}
+
+/* ── Sway: jaunty pendulum with personality ── */
+@keyframes balloon-sway {
+  0%   { transform: rotate(var(--lean, 0deg)) translateX(0px);    }
+  12%  { transform: rotate(calc(var(--lean, 0deg) + 5deg))  translateX(6px);  }
+  28%  { transform: rotate(calc(var(--lean, 0deg) - 3.5deg)) translateX(-5px); }
+  44%  { transform: rotate(calc(var(--lean, 0deg) + 4deg))  translateX(7px);  }
+  60%  { transform: rotate(calc(var(--lean, 0deg) - 4.5deg)) translateX(-6px); }
+  78%  { transform: rotate(calc(var(--lean, 0deg) + 2.5deg)) translateX(4px);  }
+  90%  { transform: rotate(calc(var(--lean, 0deg) - 2deg))  translateX(-3px); }
+  100% { transform: rotate(var(--lean, 0deg)) translateX(0px);    }
+}
+
+
+/* ── Glossy shimmer: sweeps white light across the balloon ── */
+@keyframes b-shimmer {
+  0%   { opacity: 0;    transform: rotate(-22deg) scaleX(0.4) translateX(-20px); }
+  15%  { opacity: 0.75; transform: rotate(-22deg) scaleX(1.0)  translateX(0px);  }
+  40%  { opacity: 0.55; transform: rotate(-22deg) scaleX(1.1)  translateX(6px);  }
+  70%  { opacity: 0.3;  transform: rotate(-22deg) scaleX(0.95) translateX(14px); }
+  100% { opacity: 0;    transform: rotate(-22deg) scaleX(0.4) translateX(28px); }
+}
+
+/* ── Primary highlight pulse: breathes in & out ── */
+@keyframes b-highlight-pulse {
+  0%   { opacity: 0.3;  transform: rotate(-22deg) scale(0.88); }
+  35%  { opacity: 0.65; transform: rotate(-22deg) scale(1.06); }
+  65%  { opacity: 0.5;  transform: rotate(-22deg) scale(1.02); }
+  100% { opacity: 0.3;  transform: rotate(-22deg) scale(0.88); }
+}
+
+/* ── Sparkle: multi-burst star twinkle ── */
+@keyframes b-sparkle-twinkle {
+  0%   { opacity: 0;   transform: rotate(-30deg) scale(0.5);  }
+  20%  { opacity: 0.9; transform: rotate(-30deg) scale(1.4);  }
+  35%  { opacity: 0.6; transform: rotate(-10deg) scale(1.0);  }
+  50%  { opacity: 0.95;transform: rotate(-35deg) scale(1.5);  }
+  65%  { opacity: 0.5; transform: rotate(-25deg) scale(0.9);  }
+  80%  { opacity: 0.85;transform: rotate(-30deg) scale(1.2);  }
+  100% { opacity: 0;   transform: rotate(-30deg) scale(0.5);  }
+}
+
+/* ── String wiggle: morphs between two wavy paths ── */
+@keyframes b-string-wiggle {
+  0%   { d: path("M6,0 C10,8 2,16 6,24 C10,32 2,40 6,48 C8,52 6,56 6,60");  }
+  20%  { d: path("M6,0 C3,9 9,18 6,26 C3,34 9,42 6,50 C5,54 6,58 6,60");   }
+  40%  { d: path("M6,0 C11,8 1,17 6,25 C11,33 1,41 6,49 C8,53 6,57 6,60"); }
+  60%  { d: path("M6,0 C2,9 10,17 6,26 C2,34 10,42 6,50 C4,54 6,58 6,60"); }
+  80%  { d: path("M6,0 C9,8 3,16 6,24 C9,32 3,40 6,48 C8,52 6,56 6,60");   }
+  100% { d: path("M6,0 C10,8 2,16 6,24 C10,32 2,40 6,48 C8,52 6,56 6,60"); }
+}
+
+/* ── String sway: pendulum swing from top anchor ── */
+@keyframes b-string-sway {
+  0%   { transform: rotate(-5deg);  }
+  20%  { transform: rotate(5.5deg); }
+  40%  { transform: rotate(-4deg);  }
+  65%  { transform: rotate(4.5deg); }
+  82%  { transform: rotate(-3deg);  }
+  100% { transform: rotate(-5deg);  }
+}
+
+/* ── Knot bob: tiny bob in sync with the balloon sway ── */
+@keyframes b-knot-bob {
+  0%   { transform: rotate(-3deg) scaleX(1.0);  }
+  30%  { transform: rotate(4deg)  scaleX(0.92); }
+  60%  { transform: rotate(-2deg) scaleX(1.04); }
+  100% { transform: rotate(-3deg) scaleX(1.0);  }
+}
+
+/* ── Classes ── */
+
+.balloon-wrapper {
+  position: absolute;
+  will-change: transform;
+  animation: balloon-rise linear infinite;
+}
+
+.balloon-inner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  animation: balloon-sway ease-in-out infinite;
+  transition: filter 0.12s ease;
+}
+
+/* Hover: snappy filter lift only — never interrupts the sway */
+.balloon-inner:hover {
+  filter: brightness(1.14) drop-shadow(4px 6px 0px rgba(0,0,0,0.4)) drop-shadow(0 8px 20px rgba(0,0,0,0.18));
+  cursor: grab;
+}
+
+/* Click: hard squish */
+.balloon-inner:active {
+  transform: scale(0.84) rotate(5deg) !important;
+  filter: brightness(0.95);
+  transition: transform 0.06s ease, filter 0.06s ease;
+}
+
+/* Primary gloss highlight — bigger, bolder breathe */
+.b-highlight {
+  transform-origin: 32px 30px;
+  animation: b-highlight-pulse 3.2s ease-in-out infinite;
+}
+
+/* Shimmer sweep across balloon */
+.b-shimmer {
+  transform-origin: 33px 31px;
+  animation: b-shimmer 4.5s ease-in-out infinite;
+}
+
+/* Crisp sparkle star — multi-burst twinkle */
+.b-sparkle {
+  transform-origin: 26px 21px;
+  animation: b-sparkle-twinkle 3.0s ease-in-out infinite;
+}
+
+/* Animated string container — sways from top */
+.b-string-wrap {
+  transform-origin: 6px 0px;
+  display: block;
+  animation: b-string-sway ease-in-out infinite;
+}
+
+/* String path — morphs between wave shapes */
+.b-string-path {
+  animation: b-string-wiggle ease-in-out infinite;
+}
+
+/* Knot bob */
+.b-knot {
+  transform-origin: 7px 5px;
+  animation: b-knot-bob ease-in-out infinite;
+}
+
+/* ── Custom Scrollbar for modal content ────────────── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #111;
+  border-radius: 10px;
+  border: 2px solid #f1f1f1;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #333;
+}
+

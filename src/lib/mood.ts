@@ -993,7 +993,7 @@ const additionalMoods: DetailedMood[] = [
   ...Array.from({ length: 60 }).map((_, i) => ({
     id: `mood_variant_${i}`,
     name: ['Reflective', 'Brooding', 'Giddy', 'Tender', 'Enraged', 'Terrified', 'Chill', 'Awestruck', 'Spiteful', 'Euphoric'][i % 10] + ' ' + (i + 1),
-    category: ['joy', 'sadness', 'anger', 'anxiety', 'love', 'guilt', 'sensitive', 'disgust', 'apathy', 'chaos', 'surprise'][i % 11] as MoodCategory,
+    category: ['joy', 'sadness', 'anger', 'anxiety', 'love', 'guilt', 'sensitive', 'disgust', 'apathy', 'chaos', 'surprise'][i % 11],
     hue: (i * 27) % 360,
     baseSat: 50 + (i % 40),
     baseLight: 30 + (i % 50),

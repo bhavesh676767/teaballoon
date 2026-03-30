@@ -1125,3 +1125,9 @@ export function analyzeMood(message: string): { parsedMood: Omit<DetailedMood, '
     intensity: baseIntensity,
   };
 }
+
+// Wrapper for backward compatibility with PostSecretBar
+export function classifyMood(text: string): string {
+  const { parsedMood } = analyzeMood(text);
+  return parsedMood.id;
+}

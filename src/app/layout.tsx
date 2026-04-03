@@ -16,6 +16,10 @@ const caveat = Caveat({
 export const metadata: Metadata = {
   title: "TeaBalloon",
   description: "Anonymous secrets floating in the sky.",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

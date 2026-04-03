@@ -1,10 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { getRandomName } from "@/lib/utils";
 import { classifyMood } from "@/lib/mood";
 import { motion, AnimatePresence } from "framer-motion";
+import { Type, Mic, Square, Trash2, Wind, Send, Play } from "lucide-react";
+
+function makeDistortionCurve(amount: number) {
+  let k = amount;
+  let n_samples = 44100;
+  let curve = new Float32Array(n_samples);
+  let deg = Math.PI / 180;
+  for (let i = 0; i < n_samples; ++i) {
+    let x = i * 2 / n_samples - 1;
+    curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+  }
+  return curve;
+}
 
 export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const [open, setOpen] = useState(false);
@@ -14,6 +27,134 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
+  const [mode, setMode] = useState<"text" | "voice">("text");
+  
+  // Voice state
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const [isRecording, setIsRecording] = useState(false);
+  const [audioDataUrl, setAudioDataUrl] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState<number | null>(null);
+
+  // Clear data when opened
+  useEffect(() => {
+    if (open) {
+      setMode("text");
+      setAudioDataUrl(null);
+      setIsRecording(false);
+      setCountdown(null);
+    }
+  }, [open]);
+
+  // -- Walkie-Talkie Audio Filter Logic --
+  const isRecordingRef = useRef(false);
+  
+  const startRecording = async () => {
+    try {
+      setAudioDataUrl(null);
+      isRecordingRef.current = true;
+      setIsRecording(true);
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isRecordingRef.current) {
+        // User stopped before we even got the mic
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
+      
+      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const source = audioCtx.createMediaStreamSource(stream);
+
+      // Walkie-Talkie effect: Cut lows/highs + distort
+      const bandpass = audioCtx.createBiquadFilter();
+      bandpass.type = "bandpass";
+      bandpass.frequency.value = 1500;
+      bandpass.Q.value = 1.0;
+
+      const distortion = audioCtx.createWaveShaper();
+      distortion.curve = makeDistortionCurve(100);
+      distortion.oversample = "4x";
+
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = 1.5;
+
+      const destination = audioCtx.createMediaStreamDestination();
+
+      // Chain: Source -> Bandpass -> Distortion -> Gain -> Destination
+      source.connect(bandpass);
+      bandpass.connect(distortion);
+      distortion.connect(gainNode);
+      gainNode.connect(destination);
+
+      // Use a common fallback mime type if webm isn't available
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
+      const recorder = new MediaRecorder(destination.stream, { mimeType });
+      audioChunksRef.current = [];
+
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
+      };
+
+      recorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = () => {
+          if (reader.result) setAudioDataUrl(reader.result as string);
+        };
+        // Cleanup
+        stream.getTracks().forEach(track => track.stop());
+        audioCtx.close();
+      };
+
+      mediaRecorderRef.current = recorder;
+      
+      // Let the mic boot up and record for a few seconds to avoid chopping off the first word
+      let count = 3;
+      setCountdown(count);
+      // Start recording immediately in background
+      recorder.start(200); 
+
+      const int = setInterval(() => {
+        count--;
+        if (count > 0) {
+          setCountdown(count);
+        } else {
+          clearInterval(int);
+          setCountdown(null);
+          setIsRecording(true);
+        }
+      }, 1000);
+
+    } catch (err) {
+      console.error("Mic error:", err);
+      setError("Please allow microphone access to record.");
+      setIsRecording(false);
+      isRecordingRef.current = false;
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
+    }
+  };
+
+  const stopRecording = () => {
+    isRecordingRef.current = false;
+    setCountdown(null);
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    setIsRecording(false);
+  };
+
+  const deleteRecording = () => {
+    setAudioDataUrl(null);
+    audioChunksRef.current = [];
+  };
 
   // Simple real-time email validator
   const isValidEmail = (str: string) => {
@@ -26,8 +167,12 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanMsg = message.trim();
-    if (!cleanMsg) {
-      setError("Write something first!");
+    
+    // We allow submission if they have typed text OR recorded audio.
+    const hasContent = cleanMsg || audioDataUrl;
+    
+    if (!hasContent) {
+      setError("Please write or record something first!");
       return;
     }
     if (cleanMsg.length > 280) {
@@ -50,11 +195,21 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
     const wordCount = cleanMsg.trim().split(/\s+/).length || 0;
 
     try {
+      const isVoice = mode === "voice" && audioDataUrl;
+      const fallbackText = isVoice ? "📻 [Voice Transmission]" : cleanMsg || "🎈 [Empty Balloon]";
+
+      const payloadString = JSON.stringify({
+         text: fallbackText,
+         vessel: "balloon",
+         doodle: null,
+         audio: audioDataUrl
+      });
+
       const res = await fetch("/api/post_secret", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: cleanMsg,
+          message: payloadString,
           displayName: finalName,
           mood: classifiedMood, 
           email: cleanEmail || null,
@@ -77,6 +232,8 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
     setMessage("");
     setName("");
     setEmail("");
+    setMode("text");
+    setAudioDataUrl(null);
     setLoading(false);
     onPosted();
 
@@ -98,7 +255,7 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
             className="px-6 py-3 font-black text-lg border-[4px] border-[#111] rounded-2xl text-[#111] pointer-events-auto shadow-[6px_6px_0px_#111]"
             style={{ background: "#55efc4" }}
           >
-            🎈 Balloon released!
+            <span className="flex items-center gap-2"><Wind className="w-5 h-5" /> Balloon released!</span>
           </motion.div>
         ) : open ? (
           <motion.form
@@ -113,9 +270,7 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
           >
             {/* Header row */}
             <div className="flex items-center justify-between mb-2">
-              <span className="font-black uppercase tracking-widest text-[#111]">
-                🎈 Release a secret
-              </span>
+              <span className="font-black uppercase tracking-widest text-[#111]">Release a Secret</span>
               <button
                 type="button"
                 onClick={() => { setOpen(false); setError(""); }}
@@ -136,18 +291,81 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
               className="c-input text-sm"
             />
 
-            {/* Message input */}
-            <textarea
-              placeholder="What's your secret? ✍️"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              disabled={loading}
-              maxLength={280}
-              rows={3}
-              className="c-input resize-none text-base font-caveat font-bold leading-tight"
-              style={{ fontSize: "1.25rem" }}
-              required
-            />
+            <div className="flex gap-2">
+              {/* Text Mode */}
+              <button
+                type="button"
+                onClick={() => setMode("text")}
+                className={`flex-1 c-btn flex items-center justify-center gap-2 py-2.5 transition-all text-sm font-black ${
+                  mode === 'text'
+                    ? 'bg-[#ffe66d] text-[#111] scale-[1.03]'
+                    : 'bg-white text-gray-400 hover:text-[#111]'
+                }`}
+                title="Write Text"
+              >
+                <Type className="w-5 h-5" strokeWidth={2.8} />
+                <span className="uppercase tracking-wide text-xs">Write</span>
+              </button>
+              
+              {/* Voice Mode */}
+              <button
+                type="button"
+                onClick={() => setMode("voice")}
+                className={`flex-1 c-btn flex items-center justify-center gap-2 py-2.5 transition-all text-sm font-black ${
+                  mode === 'voice'
+                    ? 'bg-[#ff6b6b] text-white scale-[1.03]'
+                    : 'bg-white text-gray-400 hover:text-[#111]'
+                }`}
+                title="Voice Whisper"
+              >
+                <Mic className="w-5 h-5" strokeWidth={2.8} />
+                <span className="uppercase tracking-wide text-xs">Voice</span>
+              </button>
+            </div>
+
+            {/* Input Areas */}
+            <div className="flex flex-col gap-3">
+              {/* Always show text area */}
+              <textarea
+                placeholder="What's your secret? ✍️"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                disabled={loading}
+                maxLength={280}
+                rows={3}
+                className="c-input resize-none text-base font-caveat font-bold leading-tight w-full block"
+                style={{ fontSize: "1.25rem" }}
+              />
+            
+              {/* Show Voice Recorder in Voice Mode */}
+              <div className={`w-full h-[100px] flex flex-col items-center justify-center border-[3px] border-[#111] rounded-xl bg-[#fffef5] relative overflow-hidden ${mode === "voice" ? "block" : "hidden"}`}>
+                 {!audioDataUrl ? (
+                   <button
+                     type="button"
+                     onClick={toggleRecording}
+                     disabled={countdown !== null}
+                     className={`flex flex-col items-center justify-center w-full h-full select-none touch-none transition-all ${countdown !== null ? 'bg-orange-400 text-white shadow-inner scale-95 cursor-not-allowed' : isRecording ? 'bg-[#ff6b6b] text-white shadow-inner scale-95' : 'hover:bg-gray-100 text-[#111]'}`}
+                   >
+                     {countdown !== null ? (
+                       <span className="font-black text-4xl mb-1">{countdown}</span>
+                     ) : isRecording ? (
+                       <Square className="w-8 h-8 mb-1 animate-pulse" />
+                     ) : (
+                       <Mic className="w-8 h-8 mb-1" />
+                     )}
+                     <span className="font-black tracking-widest text-xs uppercase">{countdown !== null ? "Starting..." : isRecording ? "Recording... (Tap to Stop)" : "Tap to Record (Walkie-Talkie)"}</span>
+                   </button>
+                 ) : (
+                   <div className="flex flex-col items-center justify-center w-full h-full bg-[#55efc4] text-[#111]">
+                     <Play className="w-8 h-8 mb-1" />
+                     <span className="font-black tracking-widest text-xs uppercase">Transmission Ready</span>
+                     <button type="button" onClick={deleteRecording} className="absolute top-2 right-2 bg-white p-1 border-[2px] border-[#111] rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                       <Trash2 className="w-4 h-4" />
+                     </button>
+                   </div>
+                 )}
+               </div>
+            </div>
             
             {/* Email input (Optional for receiving replies) */}
             <div className="relative">
@@ -183,15 +401,19 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
             {/* Footer row */}
             <div className="flex items-center justify-between gap-3 mt-1">
               <span className="text-xs font-black text-gray-400 bg-gray-100 border-[3px] border-[#111] px-3 py-1 rounded-xl">
-                {message.length}/280
+                {mode === "text" ? `${message.length}/280` : "Voice"}
               </span>
               <button
                 type="submit"
-                disabled={loading || !message.trim() || (!isEmailValidNow && email.length > 0)}
+                disabled={loading || (!message.trim() && !audioDataUrl) || (!isEmailValidNow && email.length > 0)}
                 className="c-btn px-6 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{ background: "#ffe66d" }}
               >
-                {loading ? "Blowing..." : "RELEASE 🎈"}
+                {loading ? (
+                  <span className="flex items-center gap-2"><Mic className="w-4 h-4 animate-pulse" /> Sending...</span>
+                ) : (
+                  <span className="flex items-center gap-2 font-black text-sm"><Send className="w-4 h-4" strokeWidth={3} /> RELEASE</span>
+                )}
               </button>
             </div>
           </motion.form>
@@ -207,8 +429,11 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
             className="c-btn px-8 py-4 text-[1.1rem] pointer-events-auto relative overflow-hidden group"
             style={{ background: "#4ecdc4", boxShadow: "6px 6px 0 #111" }}
           >
-            <span className="relative z-10 flex items-center gap-2">
-              <span className="text-xl">✍️</span> RELEASE A SECRET
+            <span className="relative z-10 flex items-center gap-3 font-black text-base">
+              <span className="w-8 h-8 flex items-center justify-center bg-[#111] text-[#4ecdc4] rounded-xl border-[2.5px] border-[#111]">
+                <Type className="w-4 h-4" strokeWidth={3} />
+              </span>
+              RELEASE A SECRET
             </span>
           </motion.button>
         )}

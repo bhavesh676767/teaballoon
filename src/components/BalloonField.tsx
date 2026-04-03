@@ -7,6 +7,8 @@ import { SecretModal } from "./SecretModal";
 import { PostSecretBar } from "./PostSecretBar";
 import { AnimatePresence } from "framer-motion";
 import { analyzeMood, censorMessage } from "@/lib/mood";
+import { ShieldCheck, ShieldOff } from "lucide-react";
+import { parseSecretPayload } from "@/lib/parseSecret";
 
 export function BalloonField() {
   const [secrets, setSecrets] = useState<Secret[]>([]);
@@ -80,7 +82,20 @@ export function BalloonField() {
     // 1. Filter out how many to show based on screen size
     const maxBalloons = isMobile ? 18 : 60;
     const visibleSecrets = secrets.slice(0, maxBalloons);
-    const n = visibleSecrets.length;
+    const mains: Secret[] = [];
+    const repliesMap = new Map<string, Secret[]>();
+
+    visibleSecrets.forEach((s: Secret) => {
+       const payload = parseSecretPayload(s.message);
+       if (payload.replyTo) {
+          if (!repliesMap.has(payload.replyTo)) repliesMap.set(payload.replyTo, []);
+          repliesMap.get(payload.replyTo)!.push(s);
+       } else {
+          mains.push(s);
+       }
+    });
+
+    const n = mains.length;
 
     // Use a grid system
     const COLS = isMobile ? 4 : 10;
@@ -94,25 +109,29 @@ export function BalloonField() {
     const usableWidth = maxX - minX;
     
     // Shuffle the index so older/newer secrets interleave over the screen visually
-    const shuffledSecrets = [...visibleSecrets].sort((a,b) => {
+    const shuffledSecrets = [...mains].sort((a,b) => {
         const hA = a.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
         const hB = b.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
         return hA - hB;
     });
 
     // Build a per-session seed to scramble the layout so refreshing moves them around
-    const sessionSeed = secrets.reduce((acc, s) =>
-      acc ^ s.id.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0), 0
+    const sessionSeed = mains.reduce((acc, s) =>
+      acc ^ s.id.split("").reduce((a: number, c: string) => (a * 31 + c.charCodeAt(0)) | 0, 0), 0
     );
 
     for (let i = 0; i < n; i++) {
         // Deep copy secret to alter the message text safely
         const s = { ...shuffledSecrets[i] };
         
-        // Apply profanity censoring globally
-        s.message = censorMessage(s.message, censorEnabled);
+        // Parse payload
+        const payload = parseSecretPayload(s.message);
+        payload.text = censorMessage(payload.text, censorEnabled);
         
-        const hash = s.id.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0);
+        // Repackage it so child components receive the structured JSON as a string
+        s.message = JSON.stringify(payload);
+        
+        const hash = s.id.split("").reduce((a: number, c: string) => (a * 31 + c.charCodeAt(0)) | 0, 0);
         const uhash = Math.abs(hash);
 
         // Assign to a grid cell. Use a prime-stride to spread small clusters
@@ -140,10 +159,13 @@ export function BalloonField() {
         const riseDelaySecs = Math.max(0, phaseOffset % riseDurationSecs);
         
         // Fully analyze mood semantics (matches 100+ categories)
-        const { parsedMood, intensity } = analyzeMood(s.message);
+        const { parsedMood, intensity } = analyzeMood(payload.text);
+
+        const threadReplies = repliesMap.get(s.id) || [];
 
         placements.push({
             secret: s,
+            replies: threadReplies,
             laneLeft: finalLeft,
             riseDelaySecs,
             riseDurationSecs,
@@ -174,9 +196,11 @@ export function BalloonField() {
       <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-[200]">
         <button 
           onClick={() => setCensorEnabled(!censorEnabled)}
-          className="px-4 py-2 bg-white border-[3px] border-[#111] rounded-xl font-bold text-sm shadow-[4px_4px_0px_#111] hover:mt-[2px] hover:shadow-[2px_2px_0px_#111] hover:bg-gray-50 active:mt-[4px] active:shadow-[0px_0px_0px_#111] transition-all"
+          className="flex items-center gap-1.5 px-4 py-2 bg-white border-[3px] border-[#111] rounded-xl font-bold text-sm shadow-[4px_4px_0px_#111] hover:mt-[2px] hover:shadow-[2px_2px_0px_#111] hover:bg-gray-50 active:mt-[4px] active:shadow-[0px_0px_0px_#111] transition-all"
         >
-          {censorEnabled ? "🤬 Censor: ON" : "😈 Censor: OFF"}
+          {censorEnabled
+            ? <><ShieldCheck className="w-4 h-4" strokeWidth={3} /> Censor: ON</>
+            : <><ShieldOff className="w-4 h-4" strokeWidth={3} /> Censor: OFF</>}
         </button>
       </div>
 
@@ -224,6 +248,7 @@ export function BalloonField() {
             <Balloon
               key={p.secret.id}
               secret={p.secret}
+              replies={p.replies}
               parsedMood={p.parsedMood}
               intensity={p.intensity}
               onClick={handleClick}
@@ -237,15 +262,20 @@ export function BalloonField() {
 
       {/* Modal overlay */}
       <AnimatePresence>
-        {selected && (
-          <div className="absolute inset-0 z-[300]">
-            <SecretModal 
-              secret={selected} 
-              onClose={handleClose} 
-              onBalloonPopped={fetchSecrets}
-            />
-          </div>
-        )}
+        {(() => {
+          // Find the LATEST version of the selected secret to ensure voting counts stay fresh
+          const activeSecret = selected ? secrets.find(s => s.id === selected.id) || selected : null;
+          
+          return activeSecret && (
+            <div className="absolute inset-0 z-[300]">
+              <SecretModal 
+                secret={activeSecret} 
+                onClose={handleClose} 
+                onBalloonPopped={fetchSecrets}
+              />
+            </div>
+          );
+        })()}
       </AnimatePresence>
 
       {/* Bottom input bar */}

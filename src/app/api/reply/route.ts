@@ -64,7 +64,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Email delivery choked upstream." }, { status: 500 });
     }
 
-    // 4. Send success back safely
+    // 4. ALSO store the reply as a visual thread!
+    const forwarded = req.headers.get('x-forwarded-for');
+    const ip = forwarded ? forwarded.split(/, /)[0] : "local";
+    const userAgent = req.headers.get('user-agent') || "unknown";
+
+    const payloadString = JSON.stringify({
+       text: replyMessage.trim(),
+       vessel: "balloon",
+       doodle: null,
+       replyTo: secretId
+    });
+
+    await supabaseConfigured
+      .from("teaballoon app")
+      .insert({
+        message: payloadString,
+        display_name: "Anonymous",
+        mood: "neutral",
+        email: null,
+        has_email: false,
+        word_count: replyMessage.trim().split(/\s+/).length || 0,
+        buoyancy: newBuoyancy,
+        is_active: true,
+        ip_address: ip,
+        user_agent: userAgent
+      });
+
+    // 5. Send success back safely
     return NextResponse.json({ success: true, emailSent: true });
 
   } catch (err) {

@@ -94,23 +94,39 @@ html, body {
 
 /* ── Rise: floats up with a gentle side-drift ── */
 @keyframes balloon-rise {
-  0%   { transform: translateY(110vh) translateX(0px); }
-  20%  { transform: translateY(88vh)  translateX(6px);  }
-  40%  { transform: translateY(66vh)  translateX(-8px); }
-  60%  { transform: translateY(44vh)  translateX(4px);  }
-  80%  { transform: translateY(22vh)  translateX(-6px); }
-  100% { transform: translateY(-220px) translateX(0px); }
+  0%   { transform: translateY(110vh) translateX(0px) scale(0.9); }
+  5%   { transform: translateY(104vh) translateX(4px)  scale(1.0); }
+  20%  { transform: translateY(85vh)  translateX(8px);  }
+  40%  { transform: translateY(62vh)  translateX(-10px); }
+  60%  { transform: translateY(40vh)  translateX(6px);  }
+  80%  { transform: translateY(18vh)  translateX(-8px); }
+  95%  { transform: translateY(-5vh)  translateX(3px);  }
+  100% { transform: translateY(-230px) translateX(0px) scale(0.95); }
+}
+
+@keyframes airplane-fly {
+  0%   { transform: translateY(10vh) translateX(-20vw) rotate(10deg); }
+  25%  { transform: translateY(-5vh) translateX(30vw) rotate(0deg); }
+  50%  { transform: translateY(15vh) translateX(80vw) rotate(-10deg); }
+  75%  { transform: translateY(-10vh) translateX(130vw) rotate(5deg); }
+  100% { transform: translateY(5vh) translateX(180vw) rotate(0deg); }
+}
+
+@keyframes anvil-drop {
+  0%   { transform: translateY(-50vh) translateX(0px) rotate(0deg); }
+  80%  { transform: translateY(110vh) translateX(0px) rotate(0deg); }
+  100% { transform: translateY(110vh) translateX(0px) rotate(0deg); }
 }
 
 /* ── Sway: jaunty pendulum with personality ── */
 @keyframes balloon-sway {
   0%   { transform: rotate(var(--lean, 0deg)) translateX(0px);    }
-  12%  { transform: rotate(calc(var(--lean, 0deg) + 5deg))  translateX(6px);  }
-  28%  { transform: rotate(calc(var(--lean, 0deg) - 3.5deg)) translateX(-5px); }
-  44%  { transform: rotate(calc(var(--lean, 0deg) + 4deg))  translateX(7px);  }
-  60%  { transform: rotate(calc(var(--lean, 0deg) - 4.5deg)) translateX(-6px); }
-  78%  { transform: rotate(calc(var(--lean, 0deg) + 2.5deg)) translateX(4px);  }
-  90%  { transform: rotate(calc(var(--lean, 0deg) - 2deg))  translateX(-3px); }
+  10%  { transform: rotate(calc(var(--lean, 0deg) + 6deg))  translateX(8px);  }
+  25%  { transform: rotate(calc(var(--lean, 0deg) - 4deg))  translateX(-7px); }
+  40%  { transform: rotate(calc(var(--lean, 0deg) + 5deg))  translateX(9px);  }
+  55%  { transform: rotate(calc(var(--lean, 0deg) - 5deg))  translateX(-8px); }
+  70%  { transform: rotate(calc(var(--lean, 0deg) + 3deg))  translateX(5px);  }
+  85%  { transform: rotate(calc(var(--lean, 0deg) - 2.5deg)) translateX(-4px); }
   100% { transform: rotate(var(--lean, 0deg)) translateX(0px);    }
 }
 
@@ -192,15 +208,15 @@ html, body {
 
 /* Hover: snappy filter lift only — never interrupts the sway */
 .balloon-inner:hover {
-  filter: brightness(1.14) drop-shadow(4px 6px 0px rgba(0,0,0,0.4)) drop-shadow(0 8px 20px rgba(0,0,0,0.18));
+  filter: brightness(1.12) drop-shadow(0 6px 14px rgba(0,0,0,0.3)) drop-shadow(4px 4px 0px rgba(0,0,0,0.35));
   cursor: grab;
 }
 
-/* Click: hard squish */
+/* Click: hard squish — comic book energy */
 .balloon-inner:active {
-  transform: scale(0.84) rotate(5deg) !important;
-  filter: brightness(0.95);
-  transition: transform 0.06s ease, filter 0.06s ease;
+  transform: scale(0.82) rotate(6deg) !important;
+  filter: brightness(0.9);
+  transition: transform 0.05s ease, filter 0.05s ease;
 }
 
 /* Primary gloss highlight — bigger, bolder breathe */
@@ -215,10 +231,16 @@ html, body {
   animation: b-shimmer 4.5s ease-in-out infinite;
 }
 
-/* Crisp sparkle star — multi-burst twinkle */
+/* Primary sparkle star */
 .b-sparkle {
-  transform-origin: 26px 21px;
-  animation: b-sparkle-twinkle 3.0s ease-in-out infinite;
+  transform-origin: 28px 22px;
+  animation: b-sparkle-twinkle 2.8s ease-in-out infinite;
+}
+
+/* Secondary smaller sparkle */
+.b-sparkle2 {
+  transform-origin: 38px 14px;
+  animation: b-sparkle-twinkle 3.4s ease-in-out infinite;
 }
 
 /* Animated string container — sways from top */

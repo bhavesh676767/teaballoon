@@ -15,39 +15,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing payload details." }, { status: 400 });
     }
 
-    // -- 1. TRAP THE IP & DEVICE ID --
-    const forwarded = req.headers.get('x-forwarded-for');
-    const ip = forwarded ? forwarded.split(/, /)[0] : "local";
-    const userAgent = req.headers.get('user-agent') || "unknown";
-
-    // -- 2. CHECK THE VOTE REGISTRY (Double-Layer Lock) --
-    // We check if this IP OR this Device Fingerprint has already participated
-    const { data: existingVote } = await supabaseAdmin
-      .from("teaballoon_votes")
-      .select("id")
-      .eq("secret_id", secretId)
-      .or(`ip_address.eq.${ip},user_agent.eq.${userAgent}`)
-      .maybeSingle();
-
-    if (existingVote) {
-      return NextResponse.json({ 
-        error: "Your device or network already participated in this balloon's destiny!" 
-      }, { status: 403 });
-    }
-
-    // -- 3. RECORD THE VOTE (Prevent Future Floods) --
-    const { error: registryError } = await supabaseAdmin
-      .from("teaballoon_votes")
-      .insert({
-        secret_id: secretId,
-        ip_address: ip,
-        user_agent: userAgent
-      });
-
-    if (registryError) {
-       // Risk of potential race condition collision
-       return NextResponse.json({ error: "Duplicate vote rejected." }, { status: 403 });
-    }
+    // -- PARTICIPATION CHECKS REMOVED AS PER USER REQUEST --
 
     // -- 4. APPLY THE VOTE IMPACT --
     const buoyancyImpact = delta > 0 ? 15.0 : -10.0;

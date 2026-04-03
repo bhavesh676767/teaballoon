@@ -5,40 +5,45 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Secret } from "@/lib/supabase";
 import { getMoodStyle } from "@/lib/moodConfig";
 import { analyzeMood } from "@/lib/mood";
-import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X } from "lucide-react";
+import { parseSecretPayload } from "@/lib/parseSecret";
+import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio } from "lucide-react";
 
 const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
 
 const UPVOTE_MSGS = [
-  "I found that interesting! 🌟",
-  "This resonated with me! ❤️",
-  "Exactly how I feel! 🎈",
-  "Sending good vibes back! ✨",
-  "I hear you, stranger! 🤝",
-  "That's deep! 🌊",
-  "Beautifully said! 🌸"
+  "I found that interesting!",
+  "This resonated with me!",
+  "Exactly how I feel!",
+  "Sending good vibes back!",
+  "I hear you, stranger!",
+  "That's deep.",
+  "Beautifully said."
 ];
 
 const DOWNVOTE_MSGS = [
-  "Maybe that was so boring... 🥱",
-  "A bit dark for me! 🌑",
-  "Not my cup of tea! ☕",
-  "Moved on to better clouds! ☁️",
-  "This balloon is a bit deflated! 🎈",
-  "Needs more tea! 🍵",
-  "Just floating by... 🌬️"
+  "Maybe that was so boring...",
+  "A bit dark for me.",
+  "Not my cup of tea.",
+  "Moved on to better clouds.",
+  "This balloon is a bit deflated.",
+  "Needs more tea.",
+  "Just floating by..."
 ];
 
+// Voting is now unlimited per session!
 export function SecretModal({ 
   secret, 
   onClose, 
-  onBalloonPopped 
+  onBalloonPopped,
+  onVoteSuccess
 }: { 
   secret: Secret; 
   onClose: () => void;
   onBalloonPopped?: () => void;
+  onVoteSuccess?: () => void;
 }) {
-  const { parsedMood, intensity } = analyzeMood(secret.message);
+  const payload = parseSecretPayload(secret.message);
+  const { parsedMood, intensity } = analyzeMood(payload.text);
   const moodStyle = getMoodStyle(parsedMood as any, intensity);
 
   // -- Tracking Refs
@@ -62,15 +67,22 @@ export function SecretModal({
 
   // -- Vote States
   const [voteCount, setVoteCount] = useState(secret.votes || 0);
+  
+  // Realtime Sync: If someone else votes, or the DB updates, sync the local count
+  useEffect(() => {
+    setVoteCount(secret.votes || 0);
+  }, [secret.votes]);
+
   const [voted, setVoted] = useState<"up" | "down" | null>(null);
   const [tooltip, setTooltip] = useState<string | null>(null);
+  const [isPopping, setIsPopping] = useState(false);
 
   // -- Admin states
   const [adminStep, setAdminStep] = useState(0);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  const ADMIN_SEQUENCE = ["mood", "name", "name", "down", "down", "name"];
+  const ADMIN_SEQUENCE = ["mood", "name", "name", "name"];
 
   const triggerAdminStep = (stepTag: string) => {
     if (isAdmin) return;
@@ -151,26 +163,40 @@ export function SecretModal({
   };
 
   const handleVote = async (type: "up" | "down") => {
-    if (voted) return;
-    
-    const delta = type === "up" ? 1 : -1;
-    setVoteCount(prev => prev + delta);
-    setVoted(type);
-    
     // Pick random message
     const msgs = type === "up" ? UPVOTE_MSGS : DOWNVOTE_MSGS;
     setTooltip(msgs[Math.floor(Math.random() * msgs.length)]);
     
+    // -- Unlimited logic: each click is a new vote request --
+    const delta = type === "up" ? 1 : -1;
+    setVoteCount(prev => prev + delta);
+    setVoted(type);
+    
     setTimeout(() => setTooltip(null), 2500);
 
     try {
-      await fetch("/api/vote", {
+      const res = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ secretId: secret.id, delta }),
       });
+
+      if (!res.ok) {
+        const errorData = await res.json();
+        // Fallback for failed vote
+        setVoteCount(prev => prev - delta);
+        setVoted(null);
+        setTooltip(errorData.error || "The sky rejected your vote.");
+        setTimeout(() => setTooltip(null), 3000);
+      } else {
+        onVoteSuccess?.();
+      }
     } catch (err) {
       console.error("Vote failed:", err);
+      // Rollback
+      setVoteCount(prev => prev - delta);
+      setVoted(null);
+      setTooltip("The wind was too strong. Vote lost.");
     }
   };
 
@@ -234,17 +260,20 @@ export function SecretModal({
       </AnimatePresence>
 
       {/* Comic speech card */}
-      <motion.div
-        initial={{ y: 100, opacity: 0, rotate: -3, scale: 0.9 }}
-        animate={{ y: 0, opacity: 1, rotate: 0, scale: 1 }}
-        exit={{ y: 100, opacity: 0, rotate: 3, scale: 0.9 }}
-        transition={{ type: "spring", stiffness: 400, damping: 28 }}
-        className="relative w-full max-w-sm flex flex-col z-10 pointer-events-auto max-h-[92vh] mb-4 sm:mb-0"
-      >
-        <div 
-          className="c-card-lg p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-y-auto custom-scrollbar"
-          style={{ background: "#fffef5" }}
-        >
+      <AnimatePresence>
+        {!isPopping ? (
+          <motion.div
+            key="modal-card"
+            initial={{ y: 100, opacity: 0, rotate: -3, scale: 0.9 }}
+            animate={{ y: 0, opacity: 1, rotate: 0, scale: 1 }}
+            exit={{ y: 100, opacity: 0, rotate: 3, scale: 0.9 }}
+            transition={{ type: "spring", stiffness: 400, damping: 28 }}
+            className="relative w-full max-w-sm flex flex-col z-10 pointer-events-auto max-h-[92vh] mb-4 sm:mb-0"
+          >
+            <div 
+              className="c-card-lg p-4 sm:p-6 flex flex-col gap-3 sm:gap-4 overflow-y-auto custom-scrollbar"
+              style={{ background: "#fffef5" }}
+            >
           <div 
             onClick={() => triggerAdminStep("mood")}
             className="absolute -top-5 left-8 px-4 py-1.5 border-[3px] rounded-2xl font-black text-sm uppercase flex items-center gap-2 transform -rotate-2 z-20"
@@ -299,8 +328,26 @@ export function SecretModal({
                 className="text-[1.8rem] leading-[1.3] font-bold break-words text-[#111]"
                 style={{ fontFamily: "var(--font-caveat)" }}
               >
-                "{secret.message}"
+                "{payload.text}"
               </p>
+              
+              {payload.doodle && (
+                <div className="flex justify-center mt-4">
+                  <img src={payload.doodle} className="max-h-[150px] w-auto border-[3px] border-[#111] rounded-xl bg-white shadow-[4px_4px_0_#111]" alt="Secret Doodle" />
+                </div>
+              )}
+
+              {payload.audio && (
+                <div className="flex flex-col items-center justify-center mt-4 p-3 bg-[#111] rounded-xl text-white shadow-[4px_4px_0_#55efc4]">
+                  <span className="font-black text-xs tracking-widest uppercase mb-2 flex items-center gap-2">
+                    <span className="w-6 h-6 flex items-center justify-center bg-[#55efc4] text-[#111] rounded-lg">
+                      <Radio className="w-3.5 h-3.5" strokeWidth={3} />
+                    </span>
+                    Intercepted Transmission
+                  </span>
+                  <audio controls src={payload.audio} className="w-full h-8" style={{ filter: 'invert(1)' }} />
+                </div>
+              )}
             </div>
           </div>
 
@@ -311,9 +358,8 @@ export function SecretModal({
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-2">
                 <button
-                  disabled={voted !== null}
                   onClick={() => handleVote("up")}
-                  className={`c-btn p-2 rounded-xl transition-all ${voted === 'up' ? 'bg-[#ff9f43] rotate-3' : 'bg-white'}`}
+                  className={`c-btn p-2 rounded-xl transition-all ${voted === 'up' ? 'bg-[#ff9f43] scale-110 shadow-none' : 'bg-white hover:bg-orange-50'}`}
                   style={{ border: "3px solid #111", boxShadow: voted === 'up' ? "none" : "3px 3px 0 #111" }}
                 >
                   <ArrowBigUp className={`w-7 h-7 ${voted === 'up' ? 'fill-[#111]' : ''}`} />
@@ -324,8 +370,8 @@ export function SecretModal({
                 </div>
 
                 <button
-                  onClick={() => { triggerAdminStep("down"); handleVote("down"); }}
-                  className={`c-btn p-2 rounded-xl transition-all ${voted === 'down' ? 'bg-[#54a0ff] -rotate-3' : 'bg-white'}`}
+                  onClick={() => handleVote("down")}
+                  className={`c-btn p-2 rounded-xl transition-all ${voted === 'down' ? 'bg-[#54a0ff] scale-90 shadow-none' : 'bg-white hover:bg-blue-50'}`}
                   style={{ border: "3px solid #111", boxShadow: voted === 'down' ? "none" : "3px 3px 0 #111" }}
                 >
                   <ArrowBigDown className={`w-7 h-7 ${voted === 'down' ? 'fill-[#111]' : ''}`} />
@@ -473,7 +519,22 @@ export function SecretModal({
           )}
 
         </div>
-      </motion.div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="explosion"
+            initial={{ scale: 0.2, opacity: 1 }}
+            animate={{ scale: 2.5, opacity: 0, rotate: [0, -15, 15, -10] }}
+            transition={{ duration: 0.6, ease: "easeOut" }}
+            className="absolute z-50 pointer-events-none"
+          >
+             <svg width="200" height="200" viewBox="0 0 200 200">
+                <path d="M100,10 L120,70 L190,40 L140,90 L190,140 L120,120 L100,190 L80,120 L10,140 L60,90 L10,40 L80,70 Z" fill="#ff6b6b" stroke="#111" strokeWidth="6" strokeLinejoin="round" />
+                <text x="100" y="115" textAnchor="middle" fill="#fff" fontSize="48" fontWeight="900" style={{fontFamily: 'sans-serif'}} stroke="#111" strokeWidth="3">POP!</text>
+             </svg>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

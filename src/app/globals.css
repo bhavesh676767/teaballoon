@@ -15,6 +15,16 @@ html, body {
   font-family: var(--font-outfit), sans-serif;
   color: #111;
   -webkit-font-smoothing: antialiased;
+  /* Default custom cursor (32x32) */
+  cursor: url('/cursor-sm.png') 0 0, auto;
+}
+
+/* Pointer cursor for all interactive elements */
+a, button, [role="button"], label[for],
+input[type="submit"], input[type="button"], input[type="reset"],
+select, summary,
+.balloon-inner, .c-btn {
+  cursor: url('/pointer-sm.png') 8 0, pointer;
 }
 
 /* ── Comic card base ──────────────────────────────────── */
@@ -39,7 +49,7 @@ html, body {
   box-shadow: 4px 4px 0 #111;
   font-family: var(--font-outfit), sans-serif;
   font-weight: 900;
-  cursor: pointer;
+  cursor: url('/pointer-sm.png') 8 0, pointer;
   user-select: none;
   transition: transform 80ms, box-shadow 80ms;
   display: inline-flex;
@@ -93,16 +103,44 @@ html, body {
    ══════════════════════════════════════════════════════ */
 
 /* ── Rise: floats up with a gentle side-drift ── */
-@keyframes balloon-rise {
+/* ── Variant 1: Gentle Zig-Zag ── */
+@keyframes balloon-rise-1 {
   0%   { transform: translateY(110vh) translateX(0px) scale(0.9); }
-  5%   { transform: translateY(104vh) translateX(4px)  scale(1.0); }
-  20%  { transform: translateY(85vh)  translateX(8px);  }
-  40%  { transform: translateY(62vh)  translateX(-10px); }
-  60%  { transform: translateY(40vh)  translateX(6px);  }
-  80%  { transform: translateY(18vh)  translateX(-8px); }
-  95%  { transform: translateY(-5vh)  translateX(3px);  }
-  100% { transform: translateY(-230px) translateX(0px) scale(0.95); }
+  25%  { transform: translateY(75vh)  translateX(12px) rotate(2deg); }
+  50%  { transform: translateY(45vh)  translateX(-15px) rotate(-3deg); }
+  75%  { transform: translateY(15vh)  translateX(10px) rotate(1deg); }
+  100% { transform: translateY(-250px) translateX(0px) scale(0.95); }
 }
+
+/* ── Variant 2: Sluggish Drift ── */
+@keyframes balloon-rise-2 {
+  0%   { transform: translateY(110vh) translateX(0px) scale(0.95); }
+  40%  { transform: translateY(60vh)  translateX(-25px); }
+  80%  { transform: translateY(20vh)  translateX(25px); }
+  100% { transform: translateY(-250px) translateX(0px) scale(1.0); }
+}
+
+/* ── Variant 3: Direct Ascent + Pulse ── */
+@keyframes balloon-rise-3 {
+  0%   { transform: translateY(110vh) scale(0.9); }
+  33%  { transform: translateY(70vh) scale(1.05); }
+  66%  { transform: translateY(30vh) scale(0.95); }
+  100% { transform: translateY(-250px) scale(1); }
+}
+
+/* ── Sway Variant: Lazy ── */
+@keyframes balloon-sway-lazy {
+  0%, 100% { transform: rotate(var(--lean, 0deg)); }
+  50% { transform: rotate(calc(var(--lean, 0deg) + 4deg)) translateX(5px); }
+}
+
+/* ── Sway Variant: Active ── */
+@keyframes balloon-sway-active {
+  0%, 100% { transform: rotate(var(--lean, 0deg)); }
+  25% { transform: rotate(calc(var(--lean, 0deg) + 7deg)) translateX(3px); }
+  75% { transform: rotate(calc(var(--lean, 0deg) - 7deg)) translateX(-3px); }
+}
+
 
 @keyframes airplane-fly {
   0%   { transform: translateY(10vh) translateX(-20vw) rotate(10deg); }
@@ -192,7 +230,6 @@ html, body {
 .balloon-wrapper {
   position: absolute;
   will-change: transform;
-  animation: balloon-rise linear infinite;
 }
 
 .balloon-inner {
@@ -200,16 +237,15 @@ html, body {
   display: flex;
   flex-direction: column;
   align-items: center;
-  cursor: pointer;
+  cursor: url('/pointer-sm.png') 8 0, pointer;
   user-select: none;
-  animation: balloon-sway ease-in-out infinite;
   transition: filter 0.12s ease;
 }
 
 /* Hover: snappy filter lift only — never interrupts the sway */
 .balloon-inner:hover {
   filter: brightness(1.12) drop-shadow(0 6px 14px rgba(0,0,0,0.3)) drop-shadow(4px 4px 0px rgba(0,0,0,0.35));
-  cursor: grab;
+  cursor: url('/pointer-sm.png') 8 0, pointer;
 }
 
 /* Click: hard squish — comic book energy */

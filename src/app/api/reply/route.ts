@@ -37,34 +37,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Balloon could not be found." }, { status: 404 });
     }
 
-    // Boost buoyancy for being good enough to reply to
-    const newBuoyancy = Math.min(150, (originalSecret.buoyancy || 0) + 35.0);
-    await supabaseConfigured
-      .from("teaballoon app")
-      .update({ buoyancy: newBuoyancy, is_active: true })
-      .eq("id", secretId);
 
     // 2. Determine if recipient opted for emails. 
     // If empty/null, we just silently return 200 (Success) since the UI expects a clean success 
     // without leaking whether an email was sent or not (Total anonymity!)
-    if (!originalSecret.email) {
-      return NextResponse.json({ success: true, emailSent: false });
-    }
-
-    // 3. Hand off securely to Brevo API completely detached from the user's browser
-    const emailSuccess = await sendReplyNotificationEmail({
-      originalPosterEmail: originalSecret.email,
-      originalMessage: originalSecret.message,
-      replyMessage: replyMessage.trim(),
-      gifUrl: gifUrl
-    });
-
-    if (!emailSuccess) {
-      // Return 500 so client knows sending failed, but we still never expose WHO failed.
-      return NextResponse.json({ error: "Email delivery choked upstream." }, { status: 500 });
-    }
-
-    // 4. ALSO store the reply as a visual thread!
+    // 3. ALWAYS store the reply as a visual thread!
     const forwarded = req.headers.get('x-forwarded-for');
     const ip = forwarded ? forwarded.split(/, /)[0] : "local";
     const userAgent = req.headers.get('user-agent') || "unknown";
@@ -73,10 +50,11 @@ export async function POST(req: Request) {
        text: replyMessage.trim(),
        vessel: "balloon",
        doodle: null,
+       gif: gifUrl,
        replyTo: secretId
     });
 
-    await supabaseConfigured
+    const { error: insertError } = await supabaseConfigured
       .from("teaballoon app")
       .insert({
         message: payloadString,
@@ -85,14 +63,38 @@ export async function POST(req: Request) {
         email: null,
         has_email: false,
         word_count: replyMessage.trim().split(/\s+/).length || 0,
-        buoyancy: newBuoyancy,
+        buoyancy: 100.0, // Replies start at neutral buoyancy
         is_active: true,
         ip_address: ip,
         user_agent: userAgent
       });
 
-    // 5. Send success back safely
-    return NextResponse.json({ success: true, emailSent: true });
+    if (insertError) {
+      console.error("Reply Insert Fail:", insertError);
+      return NextResponse.json({ error: "Failed to pin reply to the sky." }, { status: 500 });
+    }
+
+    // 4. Boost buoyancy for the original secret being good enough to reply to
+    const newBuoyancy = Math.min(200, (originalSecret.buoyancy || 0) + 15.0);
+    await supabaseConfigured
+      .from("teaballoon app")
+      .update({ buoyancy: newBuoyancy })
+      .eq("id", secretId);
+
+    // 5. Send email if original owner has one
+    if (!originalSecret.email) {
+      return NextResponse.json({ success: true, emailSent: false });
+    }
+
+    const emailSuccess = await sendReplyNotificationEmail({
+      originalPosterEmail: originalSecret.email,
+      originalMessage: originalSecret.message,
+      replyMessage: replyMessage.trim(),
+      gifUrl: gifUrl
+    });
+
+    return NextResponse.json({ success: true, emailSent: !!emailSuccess });
+
 
   } catch (err) {
     console.error("Reply Server Fail:", err);

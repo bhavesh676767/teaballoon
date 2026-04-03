@@ -1007,12 +1007,13 @@ DYNAMIC_MOODS.push(...additionalMoods);
 
 // ── PROFANITY FILTER / CENSORING ENGINE ──
 const PROFANITY_LIST = [
-  'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker',
-  'shit', 'shitting', 'shitty', 'bullshit',
-  'bitch', 'bitches', 'bitching',
-  'asshole', 'assholes', 'cunt', 'dick', 'cock', 'pussy',
+  'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker', 'fuk', 'fck',
+  'shit', 'shitting', 'shitty', 'bullshit', 'shiz', 'sh1t',
+  'bitch', 'bitches', 'bitching', 'btch',
+  'asshole', 'assholes', 'cunt', 'dick', 'cock', 'pussy', 'pussies',
   'slut', 'whore', 'faggot', 'nigger', 'nigga', 'retard',
-  'bastard', 'twat', 'wanker'
+  'bastard', 'twat', 'wanker', 'prick', 'bollocks', 'tosser',
+  'cum', 'jizz', 'porn', 'sex', 'rape', 'raped', 'molest', 'molested'
 ];
 
 export function censorMessage(text: string, enabled: boolean): string {

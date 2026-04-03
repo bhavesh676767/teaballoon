@@ -4,6 +4,7 @@ export interface ParsedSecretPayload {
   doodle: string | null;
   replyTo?: string;
   audio?: string | null;
+  gif?: string | null;
 }
 
 export function parseSecretPayload(msg: string): ParsedSecretPayload {
@@ -16,9 +17,11 @@ export function parseSecretPayload(msg: string): ParsedSecretPayload {
         vessel: ['balloon', 'airplane', 'anvil'].includes(p.vessel) ? p.vessel : 'balloon',
         doodle: typeof p.doodle === 'string' && p.doodle.startsWith('data:image/') ? p.doodle : null,
         replyTo: typeof p.replyTo === 'string' ? p.replyTo : undefined,
-        audio: typeof p.audio === 'string' && (p.audio.startsWith('data:audio/') || p.audio.startsWith('data:video/')) ? p.audio : null
+        audio: typeof p.audio === 'string' && (p.audio.startsWith('data:audio/') || p.audio.startsWith('data:video/')) ? p.audio : null,
+        gif: typeof p.gif === 'string' && (p.gif.startsWith('http') || p.gif.startsWith('https')) ? p.gif : null
       };
     }
+
   } catch (e) {}
   
   // Legacy / standard messages

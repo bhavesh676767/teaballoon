@@ -9,13 +9,35 @@ const supabaseAdmin = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req: Request) {
   try {
-    const { secretId, delta } = await req.json();
+    const { secretId, delta, deviceId } = await req.json();
 
-    if (!secretId || typeof delta !== "number") {
+    if (!secretId || typeof delta !== "number" || !deviceId) {
       return NextResponse.json({ error: "Missing payload details." }, { status: 400 });
     }
 
-    // -- PARTICIPATION CHECKS REMOVED AS PER USER REQUEST --
+    // -- DEVICE FINGERPRINT CHECK --
+    // We use the persistent deviceId stored in localStorage to recognize the device.
+    const { data: existingVote } = await supabaseAdmin
+      .from("teaballoon_votes")
+      .select("id")
+      .eq("secret_id", secretId)
+      .eq("user_agent", deviceId) // We repurpose user_agent column for the fixed device ID
+      .maybeSingle();
+
+    if (existingVote) {
+      return NextResponse.json({ 
+        error: "This device already participated in this balloon's destiny!" 
+      }, { status: 403 });
+    }
+
+    // Register the participation
+    await supabaseAdmin
+      .from("teaballoon_votes")
+      .insert({
+        secret_id: secretId,
+        user_agent: deviceId, // Store device identity
+        ip_address: "device-locked"
+      });
 
     // -- 4. APPLY THE VOTE IMPACT --
     const buoyancyImpact = delta > 0 ? 15.0 : -10.0;

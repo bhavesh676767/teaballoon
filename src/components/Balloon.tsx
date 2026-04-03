@@ -29,20 +29,24 @@ function StarSparkle({ cx, cy, r, className, style }: { cx: number; cy: number; 
 
 interface Props {
   secret: Secret & { mood?: string };
-  parsedMood?: Omit<DetailedMood, 'keywords'|'phrases'>;
-  intensity?: number;
-  replies?: Secret[];
+  placement: {
+    laneLeft: number;
+    riseDelaySecs: number;
+    riseDurationSecs: number;
+    parsedMood?: Omit<DetailedMood, 'keywords'|'phrases'>;
+    intensity?: number;
+    replies?: Secret[];
+  };
   onClick: (secret: Secret) => void;
-  laneLeft: number;
-  riseDelaySecs: number;
-  riseDurationSecs: number;
 }
 
 export function Balloon(props: Props) {
   return <BalloonVessel {...props} />;
 }
 
-export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick, laneLeft, riseDelaySecs, riseDurationSecs }: Props) {
+export function BalloonVessel({ secret, placement, onClick }: Props) {
+  const { laneLeft, riseDelaySecs, riseDurationSecs, parsedMood, intensity, replies } = placement;
+
   const p = useMemo(() => {
     const payload = parseSecretPayload(secret.message);
     const hash = secret.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
@@ -78,6 +82,9 @@ export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick,
     const shadowDx = 5 + (hash % 4);
     const shadowDy = 6 + (hash % 3);
 
+    const riseVariant = (hash % 3) + 1; // 1, 2, or 3
+    const swayVariant = (hash % 2) === 0 ? "lazy" : "active";
+
     return {
       size, path, style, lean, swayDur,
       buoyancyScale, buoyancyOpacity, speedFactor,
@@ -85,6 +92,7 @@ export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick,
       shimmerDelay, sparkleDelay, sparkle2Delay, knotDelay,
       stringWiggleDur, stringSwayDur,
       gradId, shadowDx, shadowDy,
+      riseVariant, swayVariant
     };
   }, [secret.id, secret.message, secret.mood, secret.buoyancy]);
 
@@ -96,8 +104,12 @@ export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick,
       onClick={() => onClick(secret)}
       style={{
         left: `${laneLeft}%`,
+        animationName: `balloon-rise-${p.riseVariant}`,
         animationDuration: `${riseDurationSecs / p.speedFactor}s`,
-        animationDelay: `-${riseDelaySecs}s`,
+        animationTimingFunction: p.riseVariant === 2 ? 'ease-in-out' : 'linear',
+        animationDelay: `${riseDelaySecs}s`,
+        animationIterationCount: 'infinite',
+        animationFillMode: 'backwards',
         opacity: p.buoyancyOpacity,
       }}
     >
@@ -105,7 +117,10 @@ export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick,
         className="balloon-inner"
         style={{
           ["--lean" as string]: `${p.lean}deg`,
+          animationName: `balloon-sway-${p.swayVariant}`,
           animationDuration: `${p.swayDur}s`,
+          animationTimingFunction: 'ease-in-out',
+          animationIterationCount: 'infinite',
           transform: `scale(${p.buoyancyScale})`,
         }}
       >
@@ -171,29 +186,7 @@ export function BalloonVessel({ secret, parsedMood, intensity, replies, onClick,
           <path d="M10,0 C14,11 5,22 10,33 C15,44 4,54 10,65 C11,69 10,71 10,72" fill="none" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeOpacity="0.5" />
         </svg>
 
-        {/* ── Threaded Replies Chain ── */}
-        {replies && replies.length > 0 && (
-          <div className="flex flex-col items-center mt-[-10px] space-y-[-12px]">
-            {replies.map((reply, idx) => {
-              const repPayload = parseSecretPayload(reply.message);
-              return (
-                <div
-                  key={reply.id}
-                  className="relative z-10 hover:brightness-110 active:scale-95 transition-all text-center"
-                  style={{ transform: `scale(${Math.max(0.62, 0.88 - idx * 0.05)})`, animation: `balloon-sway ${p.swayDur * 1.1}s ease-in-out infinite` }}
-                  onClick={(e) => { e.stopPropagation(); onClick(reply); }}
-                >
-                  <svg width="4" height="22" className="mx-auto block">
-                    <line x1="2" y1="0" x2="2" y2="22" stroke="#111" strokeWidth="2.5" strokeDasharray="4 3" />
-                  </svg>
-                  <div className="bg-white border-[3px] border-[#111] rounded-[18px] px-3 py-1.5 max-w-[110px] shadow-[3px_3px_0_#111]">
-                    <span className="font-bold text-xs truncate max-w-[90px] inline-block font-caveat">{repPayload.text}</span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+
       </div>
     </div>
   );

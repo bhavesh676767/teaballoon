@@ -7,6 +7,7 @@ import { getMoodStyle } from "@/lib/moodConfig";
 import { analyzeMood } from "@/lib/mood";
 import { parseSecretPayload } from "@/lib/parseSecret";
 import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio } from "lucide-react";
+import { getDeviceId } from "@/lib/utils";
 
 const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
 
@@ -30,14 +31,35 @@ const DOWNVOTE_MSGS = [
   "Just floating by..."
 ];
 
-// Voting is now unlimited per session!
+// -- Helpers for local persistent state
+const getLocalVotes = () => {
+  if (typeof window === "undefined") return {};
+  try {
+    return JSON.parse(localStorage.getItem("tb_votes") || "{}");
+  } catch {
+    return {};
+  }
+};
+
+const saveLocalVote = (secretId: string, type: "up" | "down") => {
+  if (typeof window === "undefined") return;
+  try {
+    const votes = getLocalVotes();
+    votes[secretId] = type;
+    localStorage.setItem("tb_votes", JSON.stringify(votes));
+  } catch {}
+};
+
+// Recognises the Device for vote protection
 export function SecretModal({ 
   secret, 
+  replies = [],
   onClose, 
   onBalloonPopped,
   onVoteSuccess
 }: { 
   secret: Secret; 
+  replies?: Secret[];
   onClose: () => void;
   onBalloonPopped?: () => void;
   onVoteSuccess?: () => void;
@@ -52,6 +74,7 @@ export function SecretModal({
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   // -- States
+  const [repliesList, setRepliesList] = useState<Secret[]>(replies);
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyLoading, setReplyLoading] = useState(false);
@@ -73,7 +96,13 @@ export function SecretModal({
     setVoteCount(secret.votes || 0);
   }, [secret.votes]);
 
-  const [voted, setVoted] = useState<"up" | "down" | null>(null);
+  useEffect(() => {
+    setRepliesList(replies);
+  }, [replies]);
+
+  const [voted, setVoted] = useState<"up" | "down" | null>(() => {
+    return getLocalVotes()[secret.id] || null;
+  });
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [isPopping, setIsPopping] = useState(false);
 
@@ -163,22 +192,25 @@ export function SecretModal({
   };
 
   const handleVote = async (type: "up" | "down") => {
+    if (voted) return;
+
     // Pick random message
     const msgs = type === "up" ? UPVOTE_MSGS : DOWNVOTE_MSGS;
     setTooltip(msgs[Math.floor(Math.random() * msgs.length)]);
     
-    // -- Unlimited logic: each click is a new vote request --
+    // -- Device-locked logic: Each device can only act once --
     const delta = type === "up" ? 1 : -1;
     setVoteCount(prev => prev + delta);
     setVoted(type);
-    
+    saveLocalVote(secret.id, type); // Keep it frozen in the browser
+
     setTimeout(() => setTooltip(null), 2500);
 
     try {
       const res = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secretId: secret.id, delta }),
+        body: JSON.stringify({ secretId: secret.id, delta, deviceId: getDeviceId() }),
       });
 
       if (!res.ok) {
@@ -220,6 +252,26 @@ export function SecretModal({
 
       if (!res.ok) throw new Error("Delivery failed.");
 
+      const result = await res.json();
+      
+      // Optimistically add to list for instant feedback
+      const newReply: Secret = {
+        id: Math.random().toString(),
+        display_name: "Anonymous",
+        message: JSON.stringify({ text: replyText.trim(), gif: selectedGif, replyTo: secret.id }),
+        votes: 0,
+        buoyancy: 100,
+        created_at: new Date().toISOString(),
+        is_active: true,
+        word_count: replyText.trim().split(/\s+/).length,
+        scroll_max: 0,
+        has_email: false,
+        total_read_time: 0,
+        impressions: 0,
+        last_engagement: new Date().toISOString()
+      };
+      setRepliesList(prev => [...prev, newReply]);
+
       setReplySuccess(true);
       setReplyText("");
       setSelectedGif(null);
@@ -227,6 +279,9 @@ export function SecretModal({
         setReplySuccess(false);
         setReplyOpen(false);
       }, 2000);
+      
+      onVoteSuccess?.(); // Trigger sky refresh
+
     } catch (err: any) {
       setReplyError("The wind blew it away. Try again.");
     } finally {
@@ -351,6 +406,46 @@ export function SecretModal({
             </div>
           </div>
 
+          {/* ── Reply Thread (outside the message box) ── */}
+          {repliesList.length > 0 && (
+            <div className="mt-3 max-h-[25vh] overflow-y-auto custom-scrollbar space-y-3 px-1">
+              <div className="flex items-center gap-2">
+                <MessageCircle className="w-3.5 h-3.5 text-gray-400" strokeWidth={3} />
+                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-gray-400">
+                  {repliesList.length} {repliesList.length === 1 ? 'Reply' : 'Replies'}
+                </span>
+                <div className="h-[2px] flex-grow bg-gray-100" />
+              </div>
+              {repliesList.map((rep, idx) => {
+                const r = parseSecretPayload(rep.message);
+                return (
+                  <motion.div
+                    key={rep.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: idx * 0.05 }}
+                    className="relative pl-4"
+                  >
+                    {/* Vertical thread line */}
+                    <div className="absolute left-[7px] top-0 bottom-0 w-[2px] bg-gray-200" />
+                    {/* Dot on the timeline */}
+                    <div className="absolute left-[3px] top-3 w-[10px] h-[10px] rounded-full bg-[#ffe66d] border-[2px] border-[#111] z-10" />
+
+                    <div className="ml-3 bg-[#fcf8e3] border-[2px] border-[#111] p-3 rounded-2xl shadow-[2px_2px_0_rgba(0,0,0,0.06)]">
+                      <p className="font-bold text-[#111] break-words" style={{ fontFamily: "var(--font-caveat)", fontSize: "1.15rem", lineHeight: 1.3 }}>
+                        {r.text}
+                      </p>
+                      {r.gif && (
+                        <img src={r.gif} className="mt-2 h-20 w-auto rounded-lg border border-[#111] bg-white" alt="gif" />
+                      )}
+                      <div className="mt-1.5 text-[9px] text-gray-400 font-black uppercase tracking-wider">Anonymous Traveler</div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Lower Interaction Section */}
           <div className="flex flex-col gap-4 mt-2">
             
@@ -378,16 +473,15 @@ export function SecretModal({
                 </button>
               </div>
 
-              {secret.has_email && (
-                <button
-                  onClick={() => setReplyOpen(!replyOpen)}
-                  className={`flex items-center gap-2 font-black text-xs uppercase px-4 py-3 rounded-xl border-[3px] border-[#111] transition-all transform ${replyOpen ? 'bg-[#111] text-white scale-95' : 'bg-[#fff] hover:-translate-y-1'}`}
-                  style={{ boxShadow: replyOpen ? "none" : "4px 4px 0 #111" }}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Reply
-                </button>
-              )}
+              <button
+                onClick={() => setReplyOpen(!replyOpen)}
+                className={`flex items-center gap-2 font-black text-xs uppercase px-4 py-3 rounded-xl border-[3px] border-[#111] transition-all transform ${replyOpen ? 'bg-[#111] text-white scale-95' : 'bg-[#fff] hover:-translate-y-1'}`}
+                style={{ boxShadow: replyOpen ? "none" : "4px 4px 0 #111" }}
+              >
+                <MessageCircle className="w-4 h-4" />
+                Reply
+              </button>
+
             </div>
 
             {/* Reply Input Form */}

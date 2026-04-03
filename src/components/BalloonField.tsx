@@ -15,6 +15,7 @@ export function BalloonField() {
   const [loading, setLoading] = useState(true);
   const [dbError, setDbError] = useState("");
   const [selected, setSelected] = useState<Secret | null>(null);
+  const [selectedReplies, setSelectedReplies] = useState<Secret[]>([]);
   const [censorEnabled, setCensorEnabled] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
 
@@ -79,14 +80,24 @@ export function BalloonField() {
   const balloonPlacements = useMemo(() => {
     if (secrets.length === 0) return [];
     
-    // 1. Filter out how many to show based on screen size
-    const maxBalloons = isMobile ? 18 : 60;
+    // 1. Calculate capacity based on screen width
+    // We aim for roughly 1 lane every 180px for a clean look
+    const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
+    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / 180));
+    const maxBalloons = Math.min(secrets.length, COLS * 4); // Max 4 balloons per lane depth
+    
     const visibleSecrets = secrets.slice(0, maxBalloons);
     const mains: Secret[] = [];
     const repliesMap = new Map<string, Secret[]>();
 
-    visibleSecrets.forEach((s: Secret) => {
+    visibleSecrets.forEach((s_original: Secret) => {
+       const s = { ...s_original };
        const payload = parseSecretPayload(s.message);
+       
+       // Global Censorship check
+       payload.text = censorMessage(payload.text, censorEnabled);
+       s.message = JSON.stringify(payload);
+
        if (payload.replyTo) {
           if (!repliesMap.has(payload.replyTo)) repliesMap.set(payload.replyTo, []);
           repliesMap.get(payload.replyTo)!.push(s);
@@ -96,74 +107,57 @@ export function BalloonField() {
     });
 
     const n = mains.length;
+    if (n === 0) return [];
 
-    // Use a grid system
-    const COLS = isMobile ? 4 : 10;
-    const ROWS = Math.ceil(n / COLS);
-    
-    const placements = [];
+    // LAME-BASED PACKING SYSTEM (Guarantees NO Overlap)
+    // We divide the screen into vertical "lanes" and stack balloons in them with timing offsets.
+    const lanes: any[][] = Array.from({ length: COLS }, () => []);
     
     // Bounds to prevent falling off the edges
-    const minX = isMobile ? 12 : 8;
-    const maxX = isMobile ? 85 : 92;
-    const usableWidth = maxX - minX;
-    
-    // Shuffle the index so older/newer secrets interleave over the screen visually
-    const shuffledSecrets = [...mains].sort((a,b) => {
-        const hA = a.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-        const hB = b.id.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
-        return hA - hB;
-    });
+    const minX = isMobile ? 8 : 5;
+    const maxX = isMobile ? 92 : 95;
+    const laneWidth = (maxX - minX) / COLS;
 
-    // Build a per-session seed to scramble the layout so refreshing moves them around
-    const sessionSeed = mains.reduce((acc, s) =>
-      acc ^ s.id.split("").reduce((a: number, c: string) => (a * 31 + c.charCodeAt(0)) | 0, 0), 0
-    );
+    const placements = [];
 
     for (let i = 0; i < n; i++) {
-        // Deep copy secret to alter the message text safely
-        const s = { ...shuffledSecrets[i] };
-        
-        // Parse payload
+        const s = mains[i];
         const payload = parseSecretPayload(s.message);
-        payload.text = censorMessage(payload.text, censorEnabled);
         
-        // Repackage it so child components receive the structured JSON as a string
-        s.message = JSON.stringify(payload);
-        
-        const hash = s.id.split("").reduce((a: number, c: string) => (a * 31 + c.charCodeAt(0)) | 0, 0);
-        const uhash = Math.abs(hash);
+        const uhash = Math.abs(s.id.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0));
 
-        // Assign to a grid cell. Use a prime-stride to spread small clusters
-        // across the entire width of the screen instead of cramming them into col 0, 1, 2
-        const col = (i * 7 + (sessionSeed % COLS) + (uhash % 3)) % COLS;
-        const row = Math.floor(i / COLS);
+        // Assign to a lane (distribute evenly)
+        const laneIdx = i % COLS;
+        const lane = lanes[laneIdx];
         
-        // Base X in the column
-        const slotWidth = usableWidth / COLS;
-        const baseLeft = minX + (col * slotWidth) + (slotWidth / 2);
-        
-        // Jitter within the column (±40%)
-        const jitter = ((uhash % 100) / 100 - 0.5) * slotWidth * 0.8;
-        const finalLeft = baseLeft + jitter;
-        
-        // Base rise duration (slow and floating)
-        const buoyancySlowdown = Math.max(0.7, Math.min(1.4, s.buoyancy / 100));
-        const riseDurationSecs = (35 + (uhash % 20)) / buoyancySlowdown;
-        
-        // Spread vertically evenly across the animation timeline
-        const rowPhase = row / Math.max(1, ROWS - 1); 
-        const verticalJitter = (((uhash >> 8) % 100) / 100 - 0.5) * 0.5; // -0.25 to 0.25 of a tier
-        
-        const phaseOffset = (rowPhase + verticalJitter / Math.max(1, ROWS)) * riseDurationSecs;
-        const riseDelaySecs = Math.max(0, phaseOffset % riseDurationSecs);
-        
-        // Fully analyze mood semantics (matches 100+ categories)
+        // Horizontal: Tighter jitter on mobile/tablet to keep balloons firmly in their lane.
+        // Desktop gets more freedom since lanes are wider.
+        const jitterFactor = isMobile ? 0.15 : 0.45;
+        const jitter = ((uhash % 100) / 100 - 0.5) * laneWidth * jitterFactor;
+        const finalLeft = minX + (laneIdx * laneWidth) + (laneWidth / 2) + jitter;
+
+        const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
+        const baseDuration = isMobile ? 22 : 32;
+        const riseDurationSecs = (baseDuration + (uhash % 12)) / buoyancyFactor;
+
+        // Staggered launch: each balloon waits its turn then loops forever.
+        // animationFillMode:'backwards' keeps balloon off-screen below during its delay.
+        //
+        // Safe depth stagger = (balloon_height / screen_height) * rise_duration.
+        // Balloon is ~200px tall; mobile screen ~700px, desktop ~900px.
+        // We use a generous multiplier to guarantee no vertical overlap within a lane.
+        const safeDepthStagger = isMobile
+          ? riseDurationSecs * (200 / 700)  // ~8s on mobile
+          : riseDurationSecs * (200 / 900); // ~7s on desktop, balloons spread more visually
+        const laneStagger = laneIdx * 1.8;                  // spread first balloon per lane
+        const depthStagger = lane.length * safeDepthStagger; // space subsequent balloons in lane
+        const riseDelaySecs = laneStagger + depthStagger + (uhash % 2);
+
+        // Analyze mood
         const { parsedMood, intensity } = analyzeMood(payload.text);
-
         const threadReplies = repliesMap.get(s.id) || [];
 
-        placements.push({
+        const p = {
             secret: s,
             replies: threadReplies,
             laneLeft: finalLeft,
@@ -171,7 +165,10 @@ export function BalloonField() {
             riseDurationSecs,
             parsedMood,
             intensity
-        });
+        };
+        
+        lane.push(p);
+        placements.push(p);
     }
     
     return placements;
@@ -179,11 +176,16 @@ export function BalloonField() {
 
 
   // ── Open balloon ──────────────────────────────────────
-  const handleClick = (secret: Secret) => setSelected(secret);
+  const handleClick = (secret: Secret, replies: Secret[] = []) => {
+    // We pass the secret object which might already be censored in placement
+    setSelected(secret);
+    setSelectedReplies(replies);
+  };
 
   // ── Close modal + increment view_count ────────────────
   const handleClose = async () => {
     setSelected(null);
+    setSelectedReplies([]);
   };
 
   // ── Render ────────────────────────────────────────────
@@ -248,13 +250,8 @@ export function BalloonField() {
             <Balloon
               key={p.secret.id}
               secret={p.secret}
-              replies={p.replies}
-              parsedMood={p.parsedMood}
-              intensity={p.intensity}
-              onClick={handleClick}
-              laneLeft={p.laneLeft}
-              riseDelaySecs={p.riseDelaySecs}
-              riseDurationSecs={p.riseDurationSecs}
+              placement={p}
+              onClick={() => handleClick(p.secret, p.replies)}
             />
           ))}
         </AnimatePresence>
@@ -270,8 +267,10 @@ export function BalloonField() {
             <div className="absolute inset-0 z-[300]">
               <SecretModal 
                 secret={activeSecret} 
+                replies={selectedReplies}
                 onClose={handleClose} 
-                onBalloonPopped={fetchSecrets}
+                onBalloonPopped={fetchSecrets} 
+                onVoteSuccess={fetchSecrets}
               />
             </div>
           );

@@ -106,10 +106,15 @@ export function BalloonField() {
     if (secrets.length === 0) return [];
     
     // 1. Calculate capacity based on screen width
-    // We aim for roughly 1 lane every 180px for a clean look
+    // We aim for roughly 1 lane every 140px on mobile, 180px on desktop
     const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / 180));
-    const maxBalloons = Math.min(secrets.length, COLS * 4); // Max 4 balloons per lane depth
+    const laneWidthPx = isMobile ? 120 : 180;
+    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / laneWidthPx));
+    
+    // Cap total balloons so it doesn't feel cluttered on small screens
+    const maxBalloons = isMobile 
+      ? Math.min(secrets.length, 12) 
+      : Math.min(secrets.length, COLS * 4); 
     
     const visibleSecrets = secrets.slice(0, maxBalloons);
     const mains: Secret[] = [];
@@ -168,7 +173,8 @@ export function BalloonField() {
         const finalLeft = minX + (laneIdx * laneWidth) + (laneWidth / 2) + jitter;
 
         const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        const baseDuration = isMobile ? 12 : 16;
+        // Slowing down the base duration for more visibility (especially on mobile)
+        const baseDuration = isMobile ? 18 : 16;
         const riseDurationSecs = (baseDuration + (uhash % 10)) / buoyancyFactor;
 
         // Safe depth stagger
@@ -178,7 +184,9 @@ export function BalloonField() {
           
         const laneStagger = laneIdx * 0.4;
         const depthStagger = olderInSameLane * safeDepthStagger;
-        const riseDelaySecs = laneStagger + depthStagger + ((uhash % 10) / 10);
+        // Small extra random jitter to ensure they don't spawn in perfect unison
+        const randomOffset = ((uhash % 30) / 10); 
+        const riseDelaySecs = laneStagger + depthStagger + randomOffset;
 
         // Analyze mood
         const { parsedMood, intensity } = analyzeMood(payload.text);

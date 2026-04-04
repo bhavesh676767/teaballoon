@@ -138,6 +138,8 @@ What to avoid:
 No formal language. No perfect grammar. ABSOLUTELY NO EM DASHES OR HYPHENS. Replace dashes with periods or commas. No "furthermore" or "in conclusion" or any essay brain words. No robotic transitions. No lists. No headers unless the original had them.
 CRITICAL IMMERSION RULE:
 This app is ONLY for anonymous secrets floating in the sky. NEVER break the 4th wall. NEVER mention Reddit, subreddits, upvotes, downvotes, threads, forums, edits, or karma. If the original text mentions those things, REMOVE THEM completely or adapt them cleanly so it sounds like someone just whispering their raw secret into the void. Stay fully in character.
+OBFUSCATION RULE:
+You MUST actively change specific facts, ages, times, numbers, names, and locations. Modify the details enough so that no one can recognize this story from its original source, but KEEP the core emotional plot intact. Make it untraceable.
 Your only job is to make the text feel like a real human sat down and typed it out. Messy, real, and readable.`
           },
           {
@@ -175,6 +177,7 @@ async function rewriteReply(originalText: string) {
 Formatting rules: No em dashes. No dashes. Just flowing paragraphs like a human actually types. No robotic transitions.
 Human typing style: Small typos are okay. Sound typed.
 Gen Z flavor & Spice: Sprinkle in gen z slang naturally. Swearing and adult language is fully allowed and encouraged. Keep it spicy but controlled. 
+OBFUSCATION RULE: Change specific facts, numbers, ages, and details if mentioned so it's impossible to trace back to the original post.
 CRITICAL IMMERSION RULE: NEVER mention Reddit, "OP", upvotes, threads, or forums. This is an anonymous venting app. Drop all 4th wall breaks and meta-references.
 CRITICAL INSTRUCTION: NO EMOJIS ALLOWED. EXACTLY ZERO EMOJIS.
 Length MUST be strictly under 20 words. Preferably under 10 words. Extremely short and punchy.`
@@ -266,7 +269,7 @@ export async function POST(req: Request) {
               vessel: "balloon",
               doodle: null,
               gif: null,
-              replyTo: insertedBalloon.id
+              replyTo: String(insertedBalloon.id)
             });
 
             const { error: replyError } = await supabase.from("teaballoon app").insert({

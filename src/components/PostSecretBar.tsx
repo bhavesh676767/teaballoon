@@ -34,6 +34,8 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const audioChunksRef = useRef<Blob[]>([]);
   const [isRecording, setIsRecording] = useState(false);
   const [audioDataUrl, setAudioDataUrl] = useState<string | null>(null);
+  const [isPlayingPreview, setIsPlayingPreview] = useState(false);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
 
   // Clear data when opened
@@ -109,12 +111,9 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
 
       mediaRecorderRef.current = recorder;
       
-      // Let the mic boot up and record for a few seconds to avoid chopping off the first word
       let count = 3;
       setCountdown(count);
-      // Start recording immediately in background
-      recorder.start(200); 
-
+      
       const int = setInterval(() => {
         count--;
         if (count > 0) {
@@ -122,9 +121,10 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
         } else {
           clearInterval(int);
           setCountdown(null);
+          recorder.start(200); // Actually start recording only after countdown
           setIsRecording(true);
         }
-      }, 1000);
+      }, 850); // Snappy countdown
 
     } catch (err) {
       console.error("Mic error:", err);
@@ -154,6 +154,25 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const deleteRecording = () => {
     setAudioDataUrl(null);
     audioChunksRef.current = [];
+    if (audioPreviewRef.current) {
+        audioPreviewRef.current.pause();
+        audioPreviewRef.current = null;
+    }
+    setIsPlayingPreview(false);
+  };
+
+  const playPreview = () => {
+    if (!audioDataUrl) return;
+    if (isPlayingPreview && audioPreviewRef.current) {
+      audioPreviewRef.current.pause();
+      setIsPlayingPreview(false);
+      return;
+    }
+    const audio = new Audio(audioDataUrl);
+    audioPreviewRef.current = audio;
+    audio.onended = () => setIsPlayingPreview(false);
+    audio.play();
+    setIsPlayingPreview(true);
   };
 
   // Simple real-time email validator
@@ -195,11 +214,12 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
     const wordCount = cleanMsg.trim().split(/\s+/).length || 0;
 
     try {
-      const isVoice = mode === "voice" && audioDataUrl;
-      const fallbackText = isVoice ? "📻 [Voice Transmission]" : cleanMsg || "🎈 [Empty Balloon]";
+      const isVoice = !!audioDataUrl; // if we have audio, it's a voice balloon
+      // Use clean message if available, otherwise voice fallback
+      const displayText = cleanMsg || (isVoice ? "📻 [Voice Transmission]" : "🎈 [Empty Balloon]");
 
       const payloadString = JSON.stringify({
-         text: fallbackText,
+         text: displayText,
          vessel: "balloon",
          doodle: null,
          audio: audioDataUrl
@@ -305,6 +325,9 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
               >
                 <Type className="w-5 h-5" strokeWidth={2.8} />
                 <span className="uppercase tracking-wide text-xs">Write</span>
+                {audioDataUrl && (
+                  <div className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-[#ff6b6b] border-[2px] border-[#111] rounded-full" />
+                )}
               </button>
               
               {/* Voice Mode */}
@@ -356,10 +379,22 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
                      <span className="font-black tracking-widest text-xs uppercase">{countdown !== null ? "Starting..." : isRecording ? "Recording... (Tap to Stop)" : "Tap to Record (Walkie-Talkie)"}</span>
                    </button>
                  ) : (
-                   <div className="flex flex-col items-center justify-center w-full h-full bg-[#55efc4] text-[#111]">
-                     <Play className="w-8 h-8 mb-1" />
-                     <span className="font-black tracking-widest text-xs uppercase">Transmission Ready</span>
-                     <button type="button" onClick={deleteRecording} className="absolute top-2 right-2 bg-white p-1 border-[2px] border-[#111] rounded-lg hover:bg-red-500 hover:text-white transition-all">
+                   <div className="flex flex-col items-center justify-center w-full h-full bg-[#55efc4] text-[#111] overflow-hidden">
+                     <button
+                       type="button"
+                       onClick={playPreview}
+                       className="flex flex-col items-center justify-center w-full h-full hover:bg-[#48d8b0] transition-colors"
+                     >
+                       {isPlayingPreview ? (
+                         <Square className="w-8 h-8 mb-1 fill-[#111]" />
+                       ) : (
+                         <Play className="w-8 h-8 mb-1 fill-[#111]" />
+                       )}
+                       <span className="font-black tracking-widest text-[10px] uppercase">
+                         {isPlayingPreview ? "Playing..." : "Tap to Preview"}
+                       </span>
+                     </button>
+                     <button type="button" onClick={deleteRecording} className="absolute top-2 right-2 bg-white p-1 border-[2px] border-[#111] rounded-lg hover:bg-red-500 hover:text-white transition-all z-10">
                        <Trash2 className="w-4 h-4" />
                      </button>
                    </div>

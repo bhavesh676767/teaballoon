@@ -9,8 +9,8 @@ export function Preloader({ onComplete }: { onComplete: () => void }) {
   useEffect(() => {
     const t = setTimeout(() => {
       setVisible(false);
-      setTimeout(onComplete, 500);
-    }, 1200);
+      setTimeout(onComplete, 400);
+    }, 600);
     return () => clearTimeout(t);
   }, [onComplete]);
 

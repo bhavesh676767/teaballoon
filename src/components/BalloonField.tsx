@@ -109,49 +109,51 @@ export function BalloonField() {
     const n = mains.length;
     if (n === 0) return [];
 
-    // LAME-BASED PACKING SYSTEM (Guarantees NO Overlap)
-    // We divide the screen into vertical "lanes" and stack balloons in them with timing offsets.
-    const lanes: any[][] = Array.from({ length: COLS }, () => []);
-    
-    // Bounds to prevent falling off the edges
-    const minX = isMobile ? 8 : 5;
-    const maxX = isMobile ? 92 : 95;
-    const laneWidth = (maxX - minX) / COLS;
+    // STABLE POSITIONING SYSTEM
+    // We derive lane and depth from the secret's own data to ensure stability.
+    // mains is NEWEST-first (index 0 is latest).
+    const mainsWithHashes = mains.map(s => ({
+      s,
+      uhash: Math.abs(s.id.split("").reduce((a, c) => (a * 29 + c.charCodeAt(0)) | 0, 0)),
+    }));
 
     const placements = [];
 
     for (let i = 0; i < n; i++) {
-        const s = mains[i];
+        const { s, uhash } = mainsWithHashes[i];
         const payload = parseSecretPayload(s.message);
         
-        const uhash = Math.abs(s.id.split("").reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 0));
-
-        // Assign to a lane (distribute evenly)
-        const laneIdx = i % COLS;
-        const lane = lanes[laneIdx];
+        // Stable lane assignment based on hash
+        const laneIdx = uhash % COLS;
         
-        // Horizontal: Tighter jitter on mobile/tablet to keep balloons firmly in their lane.
-        // Desktop gets more freedom since lanes are wider.
+        // Stable depth: how many balloons in this same lane are OLDER than me?
+        // Since mains is newest-first, older balloons are at indices > i.
+        const olderInSameLane = mainsWithHashes.slice(i + 1).filter(m => {
+          const m_uhash = m.uhash;
+          return (m_uhash % COLS) === laneIdx;
+        }).length;
+
+        const minX = isMobile ? 8 : 5;
+        const maxX = isMobile ? 92 : 95;
+        const laneWidth = (maxX - minX) / COLS;
+
+        // Horizontal: Stable jitter
         const jitterFactor = isMobile ? 0.15 : 0.45;
         const jitter = ((uhash % 100) / 100 - 0.5) * laneWidth * jitterFactor;
         const finalLeft = minX + (laneIdx * laneWidth) + (laneWidth / 2) + jitter;
 
         const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        const baseDuration = isMobile ? 22 : 32;
-        const riseDurationSecs = (baseDuration + (uhash % 12)) / buoyancyFactor;
+        const baseDuration = isMobile ? 12 : 16;
+        const riseDurationSecs = (baseDuration + (uhash % 10)) / buoyancyFactor;
 
-        // Staggered launch: each balloon waits its turn then loops forever.
-        // animationFillMode:'backwards' keeps balloon off-screen below during its delay.
-        //
-        // Safe depth stagger = (balloon_height / screen_height) * rise_duration.
-        // Balloon is ~200px tall; mobile screen ~700px, desktop ~900px.
-        // We use a generous multiplier to guarantee no vertical overlap within a lane.
+        // Safe depth stagger
         const safeDepthStagger = isMobile
-          ? riseDurationSecs * (200 / 700)  // ~8s on mobile
-          : riseDurationSecs * (200 / 900); // ~7s on desktop, balloons spread more visually
-        const laneStagger = laneIdx * 1.8;                  // spread first balloon per lane
-        const depthStagger = lane.length * safeDepthStagger; // space subsequent balloons in lane
-        const riseDelaySecs = laneStagger + depthStagger + (uhash % 2);
+          ? riseDurationSecs * (200 / 700) 
+          : riseDurationSecs * (200 / 900);
+          
+        const laneStagger = laneIdx * 0.4;
+        const depthStagger = olderInSameLane * safeDepthStagger;
+        const riseDelaySecs = laneStagger + depthStagger + ((uhash % 10) / 10);
 
         // Analyze mood
         const { parsedMood, intensity } = analyzeMood(payload.text);
@@ -167,7 +169,6 @@ export function BalloonField() {
             intensity
         };
         
-        lane.push(p);
         placements.push(p);
     }
     

@@ -47,10 +47,13 @@ export function Balloon(props: Props) {
 export function BalloonVessel({ secret, placement, onClick }: Props) {
   const { laneLeft, riseDelaySecs, riseDurationSecs, parsedMood, intensity, replies } = placement;
 
+  const payload = parseSecretPayload(secret.message);
+  const hasAudio = !!payload.audio;
+
   const p = useMemo(() => {
-    const payload = parseSecretPayload(secret.message);
+    const innerPayload = parseSecretPayload(secret.message);
     const hash = secret.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0);
-    const msgLen = payload.text.length;
+    const msgLen = innerPayload.text.length;
 
     let size = 100;
     if (msgLen < 30) size = 82;
@@ -95,8 +98,6 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
       riseVariant, swayVariant
     };
   }, [secret.id, secret.message, secret.mood, secret.buoyancy]);
-
-  const payload = parseSecretPayload(secret.message);
 
   return (
     <div
@@ -152,7 +153,19 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
 
           {/* ④ Final crisp ink outline on top */}
           <path d={p.path} fill="none" stroke="#111" strokeWidth="5.5" strokeLinejoin="round" />
+
+          {/* ⑤ Voice note icon — Sleek Audio Waveform */}
+          {hasAudio && (
+            <g transform="translate(50, 48)" style={{ pointerEvents: 'none' }}>
+               <circle cx="0" cy="0" r="14" fill="white" stroke="#111" strokeWidth="4" />
+               <rect x="-6.5" y="-4" width="3.5" height="8" rx="1.75" fill="#111" style={{ transformOrigin: "-4.75px 0px", animation: 'wave-bar 0.6s ease-in-out infinite alternate 0s' }} />
+               <rect x="-1.75" y="-7" width="3.5" height="14" rx="1.75" fill="#111" style={{ transformOrigin: "0px 0px", animation: 'wave-bar 0.5s ease-in-out infinite alternate 0.2s' }} />
+               <rect x="3" y="-5" width="3.5" height="10" rx="1.75" fill="#111" style={{ transformOrigin: "4.75px 0px", animation: 'wave-bar 0.7s ease-in-out infinite alternate 0.4s' }} />
+            </g>
+          )}
         </svg>
+
+
 
         {/* ── Vote Badge ── */}
         {secret.votes > 0 && (

@@ -108,12 +108,12 @@ export function BalloonField() {
     // 1. Calculate capacity based on screen width
     // We aim for roughly 1 lane every 140px on mobile, 180px on desktop
     const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    const laneWidthPx = isMobile ? 120 : 180;
-    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / laneWidthPx));
+    const laneWidthPx = isMobile ? 160 : 180;
+    const COLS = Math.max(isMobile ? 2 : 5, Math.floor(width / laneWidthPx));
     
-    // Cap total balloons so it doesn't feel cluttered on small screens
+    // Increase cap so more balloons actually spawn over time
     const maxBalloons = isMobile 
-      ? Math.min(secrets.length, 12) 
+      ? Math.min(secrets.length, 24) 
       : Math.min(secrets.length, COLS * 4); 
     
     const visibleSecrets = secrets.slice(0, maxBalloons);
@@ -184,9 +184,14 @@ export function BalloonField() {
           
         const laneStagger = laneIdx * 0.4;
         const depthStagger = olderInSameLane * safeDepthStagger;
-        // Small extra random jitter to ensure they don't spawn in perfect unison
+        
+        // SMART MOBILE LAUNCH: Steady sets of balloons
+        // On mobile, we launch in smaller sets (roughly 2 balloons at a time)
+        // by grouping them into "depth waves".
+        const mobileSetDelay = isMobile ? (Math.floor(i / 2) * 5) : 0;
+        
         const randomOffset = ((uhash % 30) / 10); 
-        const riseDelaySecs = laneStagger + depthStagger + randomOffset;
+        const riseDelaySecs = laneStagger + depthStagger + randomOffset + mobileSetDelay;
 
         // Analyze mood
         const { parsedMood, intensity } = analyzeMood(payload.text);

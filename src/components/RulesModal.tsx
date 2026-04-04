@@ -45,9 +45,9 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-4 items-start">
             <div className="bg-[#55efc4] border-[3px] border-[#111] p-2 rounded-lg mt-1"><MessageSquareHeart className="w-5 h-5" /></div>
             <div>
-              <h3 className="font-black text-lg uppercase italic">Don't Be a Monster</h3>
+              <h3 className="font-black text-lg uppercase italic">Pls dont be a monster</h3>
               <p className="text-sm font-bold text-gray-600 leading-relaxed font-caveat text-xl">
-                No hate speech, bullying, or targeted roasts that make people cry. Treat every stranger like a fragile porcelain doll! (not really we are jokin... but seriously, keep it classy or we'll pop your balloon with a giant comic needle). 💥🔨
+                No hate spech, bullying, or targeted roasts that make people wanna turn off thier wifi. Treat every stranger like a fragile porcelain cup. Seriously, keep it classey or we will pop your balloon with a giant comic needle.
               </p>
             </div>
           </div>
@@ -55,9 +55,9 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-4 items-start">
             <div className="bg-[#fab1a0] border-[3px] border-[#111] p-2 rounded-lg mt-1"><Ban className="w-5 h-5" /></div>
             <div>
-              <h3 className="font-black text-lg uppercase">Zero Personal Info</h3>
+              <h3 className="font-black text-lg uppercase">NO PERSONAL STUFF</h3>
               <p className="text-sm font-bold text-gray-600 leading-relaxed font-caveat text-xl">
-                Never share phone numbers, addresses, or private credentials. Protecting everyone's privacy is our highest law.
+                Never drop your phone numbers, adresses, or passwords to ur steam account. Protecting evryones privacy is basicly our only job here so dont ruin it.
               </p>
             </div>
           </div>
@@ -65,9 +65,9 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-4 items-start">
             <div className="bg-[#a29bfe] border-[3px] border-[#111] p-2 rounded-lg mt-1"><UserCheck className="w-5 h-5" /></div>
             <div>
-              <h3 className="font-black text-lg uppercase">Real Secrets Only</h3>
+              <h3 className="font-black text-lg uppercase">Real secrets Only</h3>
               <p className="text-sm font-bold text-gray-600 leading-relaxed font-caveat text-xl">
-                This sky is for authentic human emotion. No marketing, spam, or bot-generated noise. Keep it real.
+                This sky is for authentic human tears and laughs. No drop shiping ads, spam, or AI generated garbage. Let your intrusiv thoughts win for once.
               </p>
             </div>
           </div>
@@ -75,9 +75,9 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
           <div className="flex gap-4 items-start">
             <div className="bg-[#74b9ff] border-[3px] border-[#111] p-2 rounded-lg mt-1"><Info className="w-5 h-5" /></div>
             <div>
-              <h3 className="font-black text-lg uppercase">Safe Content</h3>
+              <h3 className="font-black text-lg uppercase">safe content promise</h3>
               <p className="text-sm font-bold text-gray-600 leading-relaxed font-caveat text-xl">
-                No NSFW or illegal content. We use IP trapping to keep the sky safe. Break the laws, and your balloon will be popped forever.
+                Defnitly no illegal or super nsfw stuff. We got IP traps set up like mouse traps. Break the rules and we ban you forever, no appeals, no coming back.
               </p>
             </div>
           </div>
@@ -87,13 +87,13 @@ export function RulesModal({ onClose }: { onClose: () => void }) {
         {/* Footer */}
         <div className="mt-10 pt-6 border-t-[3px] border-[#111] text-center">
           <p className="font-black text-[10px] uppercase text-gray-400 tracking-[0.2em] px-4">
-            Violating policies will result in a permanent network shadow-ban.
+            Violating policies will result in a permanent shadow ban and probly bad karma.
           </p>
           <button 
             onClick={onClose}
             className="mt-6 w-full py-4 bg-[#111] text-white font-black uppercase text-sm rounded-2xl hover:bg-gray-800 transition-colors shadow-[4px_4px_0_#999]"
           >
-            I Accept the Laws
+            I Accept the Laws (mostly)
           </button>
         </div>
 

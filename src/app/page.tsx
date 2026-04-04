@@ -13,12 +13,25 @@ function getBackground() {
   const m = d.getMinutes();
   const time = h + m / 60.0; // Decimal representation of current hour
 
-  if (time >= 5 && time < 7.5) return { img: 'url("/5-7.png")', hex: '#f6e5c0' }; 
-  if (time >= 7.5 && time < 10) return { img: 'url("/7_30 to 8_30.png")', hex: '#b5d5e5' };
-  if (time >= 10 && time < 17) return { img: 'url("/10 -11.png")', hex: '#87ceeb' }; 
-  if (time >= 17 && time < 20) return { img: 'url("/after 5 or 6.png")', hex: '#e69074' }; 
-  if (time >= 20 && time < 22) return { img: 'url("/night.png")', hex: '#1c1b33' }; 
-  return { img: 'url("/midnight ( after 10 or 11).png")', hex: '#0a0a14' }; 
+  // 1. Deep Night (Crescent Moon, dark sky): 10:00 PM to 5:00 AM
+  if (time < 5 || time >= 22) return { img: 'url("/night.png")', hex: '#16193b' }; 
+
+  // 2. Sunrise (Fiery orange/pink): 5:00 AM to 6:30 AM
+  if (time >= 5 && time < 6.5) return { img: 'url("/5-7.png")', hex: '#d96c4a' }; 
+
+  // 3. Early Morning (Deep blue, fading faint moon): 6:30 AM to 8:30 AM
+  if (time >= 6.5 && time < 8.5) return { img: 'url("/7_30 to 8_30.png")', hex: '#204074' };
+
+  // 4. Full Day (Bright sun, fluffy clouds): 8:30 AM to 5:00 PM
+  if (time >= 8.5 && time < 17) return { img: 'url("/10 -11.png")', hex: '#87ceeb' }; 
+
+  // 5. Sunset (Teal top, pink/purple bottom): 5:00 PM to 7:30 PM
+  if (time >= 17 && time < 19.5) return { img: 'url("/after 5 or 6.png")', hex: '#bd6a8b' }; 
+
+  // 6. Dusk / Twilight (Teal horizon, single bright star): 7:30 PM to 10:00 PM
+  if (time >= 19.5 && time < 22) return { img: 'url("/midnight ( after 10 or 11).png")', hex: '#162e44' }; 
+  
+  return { img: 'url("/night.png")', hex: '#16193b' }; // Fallback
 }
 
 export default function Home() {
@@ -27,7 +40,15 @@ export default function Home() {
   const [bgInfo, setBgInfo] = useState({ img: "", hex: "#87ceeb" });
 
   useEffect(() => {
+    // Initial set
     setBgInfo(getBackground());
+
+    // Live update check every 60 seconds so the sky changes without refreshing
+    const interval = setInterval(() => {
+      setBgInfo(getBackground());
+    }, 60000);
+
+    return () => clearInterval(interval);
   }, []);
 
   return (

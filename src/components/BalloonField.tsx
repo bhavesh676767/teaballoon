@@ -63,8 +63,33 @@ export function BalloonField() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "teaballoon app" },
-        () => {
-          fetchSecrets(); // Re-fetch the whole active set for consistency
+        (payload) => {
+          setSecrets((prev) => {
+            if (payload.eventType === 'INSERT' && payload.new.is_active) {
+              // Add new secret and sort
+              const updated = [payload.new as Secret, ...prev];
+              return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+            }
+            if (payload.eventType === 'UPDATE') {
+              if (payload.new.is_active) {
+                // Update existing or add if it wasn't there but became active
+                const exists = prev.some(s => s.id === payload.new.id);
+                if (exists) {
+                   return prev.map(s => s.id === payload.new.id ? payload.new as Secret : s);
+                } else {
+                   const updated = [payload.new as Secret, ...prev];
+                   return updated.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                }
+              } else {
+                // Was deactivated
+                return prev.filter(s => s.id !== payload.new.id);
+              }
+            }
+            if (payload.eventType === 'DELETE') {
+              return prev.filter(s => s.id !== payload.old?.id);
+            }
+            return prev;
+          });
         }
       )
       .subscribe();
@@ -177,11 +202,11 @@ export function BalloonField() {
 
 
   // ── Open balloon ──────────────────────────────────────
-  const handleClick = (secret: Secret, replies: Secret[] = []) => {
+  const handleClick = useCallback((secret: Secret, replies: Secret[] = []) => {
     // We pass the secret object which might already be censored in placement
     setSelected(secret);
     setSelectedReplies(replies);
-  };
+  }, []);
 
   // ── Close modal + increment view_count ────────────────
   const handleClose = async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { Secret } from "@/lib/supabase";
 import { getMoodStyle } from "@/lib/moodConfig";
 import { DetailedMood } from "@/lib/mood";
@@ -40,9 +40,13 @@ interface Props {
   onClick: (secret: Secret) => void;
 }
 
-export function Balloon(props: Props) {
+export const Balloon = memo(function Balloon(props: Props) {
   return <BalloonVessel {...props} />;
-}
+}, (prev, next) => {
+  return prev.secret.id === next.secret.id &&
+         prev.secret.votes === next.secret.votes &&
+         prev.placement.laneLeft === next.placement.laneLeft;
+});
 
 export function BalloonVessel({ secret, placement, onClick }: Props) {
   const { laneLeft, riseDelaySecs, riseDurationSecs, parsedMood, intensity, replies } = placement;

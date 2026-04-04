@@ -110,17 +110,20 @@ select, summary,
   33%  { transform: translateY(70vh) scale(1.05); }
   66%  { transform: translateY(30vh) scale(0.95); }
   100% { transform: translateY(-250px) scale(1); }
+}
 
 /* ── Sway Variant: Lazy ── */
 @keyframes balloon-sway-lazy {
   0%, 100% { transform: rotate(var(--lean, 0deg)); }
   50% { transform: rotate(calc(var(--lean, 0deg) + 4deg)) translateX(5px); }
+}
 
 /* ── Sway Variant: Active ── */
 @keyframes balloon-sway-active {
   0%, 100% { transform: rotate(var(--lean, 0deg)); }
   25% { transform: rotate(calc(var(--lean, 0deg) + 7deg)) translateX(3px); }
   75% { transform: rotate(calc(var(--lean, 0deg) - 7deg)) translateX(-3px); }
+}
 
 @keyframes airplane-fly {
   0%   { transform: translateY(10vh) translateX(-20vw) rotate(10deg); }
@@ -128,11 +131,13 @@ select, summary,
   50%  { transform: translateY(15vh) translateX(80vw) rotate(-10deg); }
   75%  { transform: translateY(-10vh) translateX(130vw) rotate(5deg); }
   100% { transform: translateY(5vh) translateX(180vw) rotate(0deg); }
+}
 
 @keyframes anvil-drop {
   0%   { transform: translateY(-50vh) translateX(0px) rotate(0deg); }
   80%  { transform: translateY(110vh) translateX(0px) rotate(0deg); }
   100% { transform: translateY(110vh) translateX(0px) rotate(0deg); }
+}
 
 /* ── Sway: jaunty pendulum with personality ── */
 @keyframes balloon-sway {
@@ -144,6 +149,7 @@ select, summary,
   70%  { transform: rotate(calc(var(--lean, 0deg) + 3deg))  translateX(5px);  }
   85%  { transform: rotate(calc(var(--lean, 0deg) - 2.5deg)) translateX(-4px); }
   100% { transform: rotate(var(--lean, 0deg)) translateX(0px);    }
+}
 
 /* ── Glossy shimmer: sweeps white light across the balloon ── */
 @keyframes b-shimmer {
@@ -152,6 +158,7 @@ select, summary,
   40%  { opacity: 0.55; transform: rotate(-22deg) scaleX(1.1)  translateX(6px);  }
   70%  { opacity: 0.3;  transform: rotate(-22deg) scaleX(0.95) translateX(14px); }
   100% { opacity: 0;    transform: rotate(-22deg) scaleX(0.4) translateX(28px); }
+}
 
 /* ── Primary highlight pulse: breathes in & out ── */
 @keyframes b-highlight-pulse {
@@ -159,6 +166,7 @@ select, summary,
   35%  { opacity: 0.65; transform: rotate(-22deg) scale(1.06); }
   65%  { opacity: 0.5;  transform: rotate(-22deg) scale(1.02); }
   100% { opacity: 0.3;  transform: rotate(-22deg) scale(0.88); }
+}
 
 /* ── Sparkle: multi-burst star twinkle ── */
 @keyframes b-sparkle-twinkle {
@@ -169,6 +177,7 @@ select, summary,
   65%  { opacity: 0.5; transform: rotate(-25deg) scale(0.9);  }
   80%  { opacity: 0.85;transform: rotate(-30deg) scale(1.2);  }
   100% { opacity: 0;   transform: rotate(-30deg) scale(0.5);  }
+}
 
 /* ── String wiggle: morphs between two wavy paths ── */
 @keyframes b-string-wiggle {
@@ -178,6 +187,7 @@ select, summary,
   60%  { d: path("M6,0 C2,9 10,17 6,26 C2,34 10,42 6,50 C4,54 6,58 6,60"); }
   80%  { d: path("M6,0 C9,8 3,16 6,24 C9,32 3,40 6,48 C8,52 6,56 6,60");   }
   100% { d: path("M6,0 C10,8 2,16 6,24 C10,32 2,40 6,48 C8,52 6,56 6,60"); }
+}
 
 /* ── String sway: pendulum swing from top anchor ── */
 @keyframes b-string-sway {
@@ -187,6 +197,7 @@ select, summary,
   65%  { transform: rotate(4.5deg); }
   82%  { transform: rotate(-3deg);  }
   100% { transform: rotate(-5deg);  }
+}
 
 /* ── Knot bob: tiny bob in sync with the balloon sway ── */
 @keyframes b-knot-bob {
@@ -194,12 +205,14 @@ select, summary,
   30%  { transform: rotate(4deg)  scaleX(0.92); }
   60%  { transform: rotate(-2deg) scaleX(1.04); }
   100% { transform: rotate(-3deg) scaleX(1.0);  }
+}
 
 /* ── Voice Wave ── animation for the inline voice note icon arcs */
 @keyframes voice-wave {
   0%   { transform: scaleX(0.8); opacity: 0.2; }
   50%  { transform: scaleX(1.3); opacity: 1; }
   100% { transform: scaleX(0.8); opacity: 0.2; }
+}
 
 /* ── Classes ── */
 .balloon-wrapper {

@@ -249,11 +249,15 @@ export async function POST(req: Request) {
         user_agent: "TeaBalloon Bot triggered via UI"
       }).select("id").single();
       
+      console.log("Supabase Parent Insert:", { data: insertedBalloon, error });
+
       if (!error && insertedBalloon) {
         seededCount++;
 
         // Process comments for this post dynamically based on their popularity
         const comments = await getRedditComments(post.subreddit, post.id);
+        console.log("Fetched comments length:", comments.length);
+        
         for (const comment of comments) {
           const rewrittenReply = await rewriteReply(comment);
           if (rewrittenReply) {
@@ -265,7 +269,7 @@ export async function POST(req: Request) {
               replyTo: insertedBalloon.id
             });
 
-            await supabase.from("teaballoon app").insert({
+            const { error: replyError } = await supabase.from("teaballoon app").insert({
               message: replyPayload,
               display_name: "Anonymous",
               mood: "neutral",
@@ -277,8 +281,14 @@ export async function POST(req: Request) {
               ip_address: "bot",
               user_agent: "TeaBalloon Bot triggered via UI"
             });
+            if (replyError) console.error("Reply Insert Error:", replyError);
+            else console.log("Reply inserted for balloon", insertedBalloon.id);
+          } else {
+            console.error("rewrittenReply was null");
           }
         }
+      } else {
+         console.error("Failed or no insertedBalloon returned:", error);
       }
     }
   }

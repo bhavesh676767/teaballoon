@@ -38,6 +38,8 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [bgInfo, setBgInfo] = useState({ img: "", hex: "#87ceeb" });
+  const [logoClicks, setLogoClicks] = useState(0);
+  const [isSeeding, setIsSeeding] = useState(false);
 
   useEffect(() => {
     // Initial set
@@ -67,12 +69,27 @@ export default function Home() {
         <div className="fixed inset-0 z-10">
           {/* Main Top Logo & Rules Control */}
           <div className="absolute top-4 left-4 z-50 flex flex-col items-start gap-2">
-            <div
-              className="inline-block border-[3px] border-[#111] px-4 py-1.5 font-black text-sm uppercase tracking-[0.2em] bg-white transform -rotate-1"
+            <button
+              onClick={async () => {
+                const newCount = logoClicks + 1;
+                setLogoClicks(newCount);
+                if (newCount === 5 && !isSeeding) {
+                  setLogoClicks(0);
+                  setIsSeeding(true);
+                  try {
+                    await fetch('/api/seed', { method: 'POST' });
+                  } catch (e) {
+                    console.error("Seed failed", e);
+                  } finally {
+                    setIsSeeding(false);
+                  }
+                }
+              }}
+              className="inline-block border-[3px] border-[#111] px-4 py-1.5 font-black text-sm uppercase tracking-[0.2em] bg-white transform -rotate-1 cursor-pointer hover:bg-gray-50 transition-colors"
               style={{ boxShadow: "3px 3px 0 #111", borderRadius: "10px" }}
             >
-              TeaBalloon
-            </div>
+              {isSeeding ? "Seeding..." : "TeaBalloon"}
+            </button>
             
             <button
               onClick={() => setShowRules(true)}

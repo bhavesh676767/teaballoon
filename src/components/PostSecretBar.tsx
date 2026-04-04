@@ -194,8 +194,10 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
       setError("Please write or record something first!");
       return;
     }
-    if (cleanMsg.length > 280) {
-      setError("Max 280 characters.");
+    const currentWordCount = cleanMsg ? cleanMsg.split(/\s+/).length : 0;
+    
+    if (currentWordCount > 1000) {
+      setError("Max limit is 1000 words.");
       return;
     }
     
@@ -208,10 +210,9 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
     setLoading(true);
     setError("");
 
-    // ── Advanced Classification System ──
     const classifiedMood = classifyMood(cleanMsg);
     const finalName = name.trim() || getRandomName();
-    const wordCount = cleanMsg.trim().split(/\s+/).length || 0;
+    const wordCount = currentWordCount;
 
     try {
       const isVoice = !!audioDataUrl; // if we have audio, it's a voice balloon
@@ -354,7 +355,7 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 disabled={loading}
-                maxLength={280}
+                maxLength={20000}
                 rows={3}
                 className="c-input resize-none text-base font-caveat font-bold leading-tight w-full block"
                 style={{ fontSize: "1.25rem" }}
@@ -436,7 +437,7 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
             {/* Footer row */}
             <div className="flex items-center justify-between gap-3 mt-1">
               <span className="text-xs font-black text-gray-400 bg-gray-100 border-[3px] border-[#111] px-3 py-1 rounded-xl">
-                {mode === "text" ? `${message.length}/280` : "Voice"}
+                {mode === "text" ? `${message.trim() ? message.trim().split(/\s+/).length : 0}/1000 words` : "Voice"}
               </span>
               <button
                 type="submit"

@@ -171,12 +171,12 @@ export function BalloonField() {
         const finalLeft = minX + (laneIdx * spacing) + jitter;
 
         const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        const baseDuration = isMobile ? 22 : 18; 
-        const riseDurationSecs = (baseDuration + (uhash % 18)) / buoyancyFactor;
+        const baseDuration = isMobile ? 28 : 18; 
+        const riseDurationSecs = (baseDuration + (uhash % 15)) / buoyancyFactor;
 
-        // Timing: Tighter stagger to ensure density (at least 5 on screen)
-        const indexStagger = i * (isMobile ? 0.95 : 0.8);
-        const randomOffset = ((uhash % 80) / 10); // 0 to 8s
+        // Timing: One-by-one release (4s gap on mobile)
+        const indexStagger = i * (isMobile ? 4.0 : 0.8);
+        const randomOffset = ((uhash % 30) / 10); // 0 to 3s
         
         const riseDelaySecs = indexStagger + randomOffset;
 

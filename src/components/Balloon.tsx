@@ -105,8 +105,7 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
 
   return (
     <div
-      className="balloon-wrapper"
-      onClick={() => onClick(secret)}
+      className="balloon-wrapper pointer-events-none"
       style={{
         left: `${laneLeft}%`,
         transform: 'translateX(-50%)',
@@ -135,8 +134,8 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
           width={p.size}
           height={p.size}
           viewBox="0 0 100 100"
-          className="relative z-10 select-none"
-          overflow="hidden"
+          className="relative z-10 select-none pointer-events-auto cursor-pointer"
+          onClick={(e) => { e.stopPropagation(); onClick(secret); }}
           style={{ filter: "drop-shadow(2px 3px 0px rgba(0,0,0,0.12))", overflow: "hidden" }}
         >
           <defs>

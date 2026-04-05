@@ -1006,30 +1006,71 @@ DYNAMIC_MOODS.push(...additionalMoods);
 
 
 // ── PROFANITY FILTER / CENSORING ENGINE ──
-const PROFANITY_LIST = [
-  'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker', 'fuk', 'fck',
-  'shit', 'shitting', 'shitty', 'bullshit', 'shiz', 'sh1t',
-  'bitch', 'bitches', 'bitching', 'btch',
-  'asshole', 'assholes', 'cunt', 'dick', 'cock', 'pussy', 'pussies',
-  'slut', 'whore', 'faggot', 'nigger', 'nigga', 'retard',
-  'bastard', 'twat', 'wanker', 'prick', 'bollocks', 'tosser',
-  'cum', 'jizz', 'porn', 'sex', 'rape', 'raped', 'molest', 'molested'
-];
+const PROFANITY_MAP: Record<string, string> = {
+  'fuck': 'fridge',
+  'fucking': 'fridging',
+  'fucked': 'fridged',
+  'fucker': 'fridger',
+  'motherfucker': 'motherfridger',
+  'fuk': 'frick',
+  'fck': 'frck',
+  'shit': 'shirt',
+  'shitting': 'shirting',
+  'shitty': 'shirty',
+  'bullshit': 'bullshirt',
+  'shiz': 'shizz',
+  'sh1t': 'sh1rt',
+  'bitch': 'beach',
+  'bitches': 'beaches',
+  'bitching': 'beaching',
+  'btch': 'bech',
+  'asshole': 'ashhole',
+  'assholes': 'ashholes',
+  'cunt': 'cake',
+  'dick': 'dih',
+  'cock': 'chicken',
+  'pussy': 'kitty',
+  'pussies': 'kitties',
+  'slut': 'sloth',
+  'whore': 'chore',
+  'faggot': 'baguette',
+  'nigger': 'brother',
+  'nigga': 'friend',
+  'retard': 'regard',
+  'bastard': 'mustard',
+  'twat': 'swat',
+  'wanker': 'winker',
+  'prick': 'brick',
+  'bollocks': 'blocks',
+  'tosser': 'flosser',
+  'cum': 'crumb',
+  'jizz': 'fizz',
+  'porn': 'corn',
+  'sex': 'seggs',
+  'rape': 'grape',
+  'raped': 'graped',
+  'molest': 'bother',
+  'molested': 'bothered'
+};
 
 export function censorMessage(text: string, enabled: boolean): string {
   if (!enabled) return text;
 
   let censored = text;
   
-  // Special rule: replace "rape" or "raped" with the grape emoji
-  censored = censored.replace(/\b(rape|raped)\b/gi, '🍇');
-
-  for (const word of PROFANITY_LIST) {
+  for (const [word, replacement] of Object.entries(PROFANITY_MAP)) {
     // Regex matches the word boundary, case-insensitive
     const regex = new RegExp(`\\b${word}\\b`, 'gi');
     censored = censored.replace(regex, (match) => {
-      // Keep first letter, replace rest with asterisks
-      return match.charAt(0) + '*'.repeat(match.length - 1);
+      // Preserve uppercase if the entire word (length > 1) is uppercase
+      if (match === match.toUpperCase() && match.length > 1) {
+        return replacement.toUpperCase();
+      }
+      // Preserve title case
+      if (match[0] === match[0].toUpperCase()) {
+        return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+      }
+      return replacement;
     });
   }
   return censored;

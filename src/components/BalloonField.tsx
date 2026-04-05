@@ -148,11 +148,13 @@ export function BalloonField() {
       return { s, uhash, speedFactor };
     });
 
-    // ── Pass 3: Assign lanes (round-robin + hash offset for variety) ──
+    // ── Pass 3: Assign lanes (strict round-robin → perfectly even distribution) ──
+    // Using pure round-robin (i % COLS) guarantees equal balloon count per lane.
+    // The old hash-offset formula caused right-lane bias on mobile.
     const laneAssignments: number[]  = [];
     const laneCounts      = new Array<number>(COLS).fill(0);
     for (let i = 0; i < n; i++) {
-      const lane = (i + (mainsWithMeta[i].uhash % COLS)) % COLS;
+      const lane = i % COLS;
       laneAssignments.push(lane);
       laneCounts[lane]++;
     }
@@ -173,9 +175,11 @@ export function BalloonField() {
       const totalInLane  = laneCounts[laneIdx];
 
       // ── Horizontal ──
-      // Mobile: ZERO jitter — lane centres are already safely spaced
+      // Mobile: small bounded jitter (±9% of spacing) for visual variety without cross-lane overlap
       // Desktop: organic jitter up to 45% of inter-lane gap
-      const jitter   = isMobile ? 0 : ((uhash % 100) / 100 - 0.5) * spacing * 0.45;
+      const jitter = isMobile
+        ? ((uhash % 100) / 100 - 0.5) * spacing * 0.18
+        : ((uhash % 100) / 100 - 0.5) * spacing * 0.45;
       const finalLeft = minX + laneIdx * spacing + jitter;
 
       // ── Duration ──

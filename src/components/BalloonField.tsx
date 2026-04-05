@@ -100,32 +100,33 @@ export function BalloonField() {
     };
   }, [fetchSecrets]);
 
-  // ── Spread Layout: Deep Guaranteed Grid ─────
-  // Limits total balloons depending on device so mobile isn't overwhelmed.
-  // Constrains minimum and maximum Left positions to prevent edge cutoff.
+  // ── Non-Overlapping Balloon Placement ─────────────────────────────────────
+  // Design principles:
+  //   1. Horizontal: 3 lanes on mobile (125px apart) with ZERO jitter → no cross-lane clash
+  //   2. Duration:   All mobile balloons share one fixed CSS duration → lane-mates never drift
+  //   3. Phase:      Lane-mates get evenly-spaced start offsets (0/K, 1/K, 2/K …) → no vertical clash
   const balloonPlacements = useMemo(() => {
     if (secrets.length === 0) return [];
-    
-    // 1. Calculate capacity based on screen width
+
     const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    const laneWidthPx = isMobile ? 90 : 180;
-    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / laneWidthPx));
-    const maxBalloons = isMobile 
-      ? Math.min(12, secrets.length) 
+
+    // Mobile: 3 columns → center-to-center ≈ 125px > max balloon diameter → safe
+    // Desktop: dynamic column count based on viewport width
+    const COLS      = isMobile ? 3 : Math.max(5, Math.floor(width / 180));
+    const maxBalloons = isMobile
+      ? Math.min(12, secrets.length)
       : Math.min(COLS * 5, secrets.length);
 
-    // ── CRITICAL FIX ──
-    // First pass: categorize ALL secrets into mains vs replies.
-    // We must do this BEFORE slicing, because secrets are ordered newest-first
-    // and many newest entries are replies — slicing first starves us of mains.
+    // ── Pass 1: Split ALL secrets into mains vs replies BEFORE slicing ──
+    // (secrets are newest-first; many recent entries are replies — slicing first starves mains)
     const allMains: Secret[] = [];
     const repliesMap = new Map<string, Secret[]>();
 
     secrets.forEach((s_original: Secret) => {
-      const s = { ...s_original };
+      const s       = { ...s_original };
       const payload = parseSecretPayload(s.message);
-      payload.text = censorMessage(payload.text, censorEnabled);
-      s.message = JSON.stringify(payload);
+      payload.text  = censorMessage(payload.text, censorEnabled);
+      s.message     = JSON.stringify(payload);
 
       if (payload.replyTo) {
         if (!repliesMap.has(payload.replyTo)) repliesMap.set(payload.replyTo, []);
@@ -135,74 +136,88 @@ export function BalloonField() {
       }
     });
 
-    // Second pass: cap only the mains to maxBalloons — guaranteed balloon count
     const mains = allMains.slice(0, maxBalloons);
-
-    const n = mains.length;
+    const n     = mains.length;
     if (n === 0) return [];
 
-    // STABLE POSITIONING SYSTEM
-    const mainsWithHashes = mains.map(s => ({
-      s,
-      uhash: Math.abs(s.id.split("").reduce((a, c) => (a * 29 + c.charCodeAt(0)) | 0, 0)),
-    }));
+    // ── Pass 2: Stable per-secret hash + speed factor ──
+    const MOBILE_CSS_DURATION = 24; // seconds — identical for all balloons on mobile
+    const mainsWithMeta = mains.map(s => {
+      const uhash       = Math.abs(s.id.split("").reduce((a, c) => (a * 29 + c.charCodeAt(0)) | 0, 0));
+      const speedFactor = Math.max(0.65, Math.min(1.35, s.buoyancy / 100));
+      return { s, uhash, speedFactor };
+    });
 
+    // ── Pass 3: Assign lanes (round-robin + hash offset for variety) ──
+    const laneAssignments: number[]  = [];
+    const laneCounts      = new Array<number>(COLS).fill(0);
+    for (let i = 0; i < n; i++) {
+      const lane = (i + (mainsWithMeta[i].uhash % COLS)) % COLS;
+      laneAssignments.push(lane);
+      laneCounts[lane]++;
+    }
+
+    // ── Pass 4: Place balloons ──
+    // Horizontal bands (in % of viewport width)
+    const minX    = isMobile ? 18 : 5;
+    const maxX    = isMobile ? 82 : 95;
+    const spacing = (maxX - minX) / Math.max(1, COLS - 1);
+
+    const lanePhaseCounters = new Array<number>(COLS).fill(0);
     const placements = [];
 
     for (let i = 0; i < n; i++) {
-        const { s, uhash } = mainsWithHashes[i];
-        
-        // ── GUARANTEED SPREAD ──
-        // Instead of hash-based lane (which can cluster), we use round-robin
-        // to ENSURE that balloons occupy all screen area evenly.
-        const laneIdx = (i + (uhash % COLS)) % COLS;
-        
-        // ── EDGE-PERFECT TOUCHING (Center Logic) ──
-        // To touch the edge without cutting, center must be at Exactly 1 Radius.
-        // For mobile, radius is ~14%. So leftmost lane center @ 14, rightmost lane center @ 86.
-        const minX = isMobile ? 14 : 5;
-        const maxX = isMobile ? 86 : 95;
-        
-        const totalLaneSpan = maxX - minX;
-        const spacing = totalLaneSpan / Math.max(1, COLS - 1);
-        
-        // Horizontal: Base center + stable jitter
-        const jitterFactor = isMobile ? 0.3 : 0.45;
-        const jitter = ((uhash % 100) / 100 - 0.5) * spacing * jitterFactor;
-        const finalLeft = minX + (laneIdx * spacing) + jitter;
+      const { s, uhash, speedFactor } = mainsWithMeta[i];
+      const laneIdx      = laneAssignments[i];
+      const posInLane    = lanePhaseCounters[laneIdx]++;
+      const totalInLane  = laneCounts[laneIdx];
 
-        const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        const baseDuration = isMobile ? 22 : 18; 
-        const riseDurationSecs = (baseDuration + (uhash % 15)) / buoyancyFactor;
+      // ── Horizontal ──
+      // Mobile: ZERO jitter — lane centres are already safely spaced
+      // Desktop: organic jitter up to 45% of inter-lane gap
+      const jitter   = isMobile ? 0 : ((uhash % 100) / 100 - 0.5) * spacing * 0.45;
+      const finalLeft = minX + laneIdx * spacing + jitter;
 
-        // Timing: Use negative delays so balloons appear mid-animation on load
-        // (negative delay = animation already started N seconds ago = balloon already rising)
-        // First balloon gets a tiny positive delay, rest get negative to look pre-populated.
-        const effectiveDuration = riseDurationSecs / Math.max(0.65, Math.min(1.35, s.buoyancy / 100));
-        const randomPhase = ((uhash % 100) / 100) * effectiveDuration; // 0..duration
-        // i=0: small positive delay so we see a fresh launch; i>0: negative to feel pre-started
-        const riseDelaySecs = i === 0
-          ? ((uhash % 20) / 10)  // 0–2s positive stagger for the first balloon
-          : -(randomPhase);      // negative = already mid-rise on mount
+      // ── Duration ──
+      // Mobile: riseDurationSecs is set so that Balloon.tsx's division by speedFactor
+      //         always yields MOBILE_CSS_DURATION → all balloons loop in perfect sync.
+      //         ( Balloon.tsx: actualCss = riseDurationSecs / speedFactor )
+      //         ( So: riseDurationSecs = MOBILE_CSS_DURATION * speedFactor )
+      const riseDurationSecs = isMobile
+        ? MOBILE_CSS_DURATION * speedFactor
+        : (18 + (uhash % 15)) / speedFactor; // desktop keeps organic variance
 
-        // Analyze mood
-        const payload = parseSecretPayload(s.message);
-        const { parsedMood, intensity } = analyzeMood(payload.text);
-        const threadReplies = repliesMap.get(s.id) || [];
+      const actualCssDuration = isMobile ? MOBILE_CSS_DURATION : riseDurationSecs / speedFactor;
 
-        placements.push({
-            secret: s,
-            replies: threadReplies,
-            laneLeft: finalLeft,
-            riseDelaySecs,
-            riseDurationSecs,
-            parsedMood,
-            intensity
-        });
+      // ── Phase within lane (evenly distributed → never vertically aligned) ──
+      // posInLane / totalInLane spreads balloons evenly across the cycle.
+      // Extra per-lane offset desynchronises adjacent lanes from each other.
+      const inLanePhase  = totalInLane > 1 ? posInLane / totalInLane : 0;
+      const laneOffset   = (laneIdx / COLS) * (1 / COLS); // small shift between lanes
+      const finalPhase   = (inLanePhase + laneOffset) % 1.0;
+
+      // Negative delay = animation is already mid-cycle on mount → instant full sky
+      const riseDelaySecs = -(finalPhase * actualCssDuration);
+
+      const payload      = parseSecretPayload(s.message);
+      const { parsedMood, intensity } = analyzeMood(payload.text);
+      const threadReplies = repliesMap.get(s.id) || [];
+
+      placements.push({
+        secret: s,
+        replies: threadReplies,
+        laneLeft: finalLeft,
+        riseDelaySecs,
+        riseDurationSecs,
+        parsedMood,
+        intensity,
+      });
     }
-    
+
     return placements;
   }, [secrets, isMobile, censorEnabled]);
+
+
 
 
   // ── Open balloon ──────────────────────────────────────

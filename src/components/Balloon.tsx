@@ -115,7 +115,7 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
         animationTimingFunction: p.riseVariant === 2 ? 'ease-in-out' : 'linear',
         animationDelay: `${riseDelaySecs}s`,
         animationIterationCount: 'infinite',
-        animationFillMode: 'backwards',
+        animationFillMode: 'none',
         opacity: p.buoyancyOpacity,
       }}
     >

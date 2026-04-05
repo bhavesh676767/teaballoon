@@ -171,14 +171,18 @@ export function BalloonField() {
         const finalLeft = minX + (laneIdx * spacing) + jitter;
 
         const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        const baseDuration = isMobile ? 28 : 18; 
+        const baseDuration = isMobile ? 22 : 18; 
         const riseDurationSecs = (baseDuration + (uhash % 15)) / buoyancyFactor;
 
-        // Timing: One-by-one release (4s gap on mobile)
-        const indexStagger = i * (isMobile ? 4.0 : 0.8);
-        const randomOffset = ((uhash % 30) / 10); // 0 to 3s
-        
-        const riseDelaySecs = indexStagger + randomOffset;
+        // Timing: Use negative delays so balloons appear mid-animation on load
+        // (negative delay = animation already started N seconds ago = balloon already rising)
+        // First balloon gets a tiny positive delay, rest get negative to look pre-populated.
+        const effectiveDuration = riseDurationSecs / Math.max(0.65, Math.min(1.35, s.buoyancy / 100));
+        const randomPhase = ((uhash % 100) / 100) * effectiveDuration; // 0..duration
+        // i=0: small positive delay so we see a fresh launch; i>0: negative to feel pre-started
+        const riseDelaySecs = i === 0
+          ? ((uhash % 20) / 10)  // 0–2s positive stagger for the first balloon
+          : -(randomPhase);      // negative = already mid-rise on mount
 
         // Analyze mood
         const payload = parseSecretPayload(s.message);

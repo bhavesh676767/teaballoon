@@ -217,6 +217,7 @@ select, summary,
 /* ── Classes ── */
 .balloon-wrapper {
   position: absolute;
+  bottom: 0;
   will-change: transform;
 }
 .balloon-inner {

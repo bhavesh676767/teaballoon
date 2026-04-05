@@ -7,17 +7,7 @@ import { classifyMood } from "@/lib/mood";
 import { motion, AnimatePresence } from "framer-motion";
 import { Type, Mic, Square, Trash2, Wind, Send, Play } from "lucide-react";
 
-function makeDistortionCurve(amount: number) {
-  let k = amount;
-  let n_samples = 44100;
-  let curve = new Float32Array(n_samples);
-  let deg = Math.PI / 180;
-  for (let i = 0; i < n_samples; ++i) {
-    let x = i * 2 / n_samples - 1;
-    curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
-  }
-  return curve;
-}
+// -- Lo-Fi Audio Filter logic: Smoothes instead of distorts --
 
 export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
   const [open, setOpen] = useState(false);
@@ -67,26 +57,32 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const source = audioCtx.createMediaStreamSource(stream);
 
-      // Walkie-Talkie effect: Cut lows/highs + distort
-      const bandpass = audioCtx.createBiquadFilter();
-      bandpass.type = "bandpass";
-      bandpass.frequency.value = 1500;
-      bandpass.Q.value = 1.0;
+      // Lo-Fi Soothing profile: High-shelf cut + Low-shelf boost + Compression
+      // Warm mid-focus (700Hz - 2500Hz)
+      const lpFilter = audioCtx.createBiquadFilter();
+      lpFilter.type = "lowpass";
+      lpFilter.frequency.value = 2500;
+      lpFilter.Q.value = 0.7;
 
-      const distortion = audioCtx.createWaveShaper();
-      distortion.curve = makeDistortionCurve(100);
-      distortion.oversample = "4x";
+      const hpFilter = audioCtx.createBiquadFilter();
+      hpFilter.type = "highpass";
+      hpFilter.frequency.value = 200;
 
-      const gainNode = audioCtx.createGain();
-      gainNode.gain.value = 1.5;
+      // Smoothe out the peaks for "ear soothing" feel
+      const compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.value = -24;
+      compressor.knee.value = 30;
+      compressor.ratio.value = 8;
+      compressor.attack.value = 0.003;
+      compressor.release.value = 0.25;
 
       const destination = audioCtx.createMediaStreamDestination();
 
-      // Chain: Source -> Bandpass -> Distortion -> Gain -> Destination
-      source.connect(bandpass);
-      bandpass.connect(distortion);
-      distortion.connect(gainNode);
-      gainNode.connect(destination);
+      // Chain: Source -> HP -> LP -> Compressor -> Destination
+      source.connect(hpFilter);
+      hpFilter.connect(lpFilter);
+      lpFilter.connect(compressor);
+      compressor.connect(destination);
 
       // Use a common fallback mime type if webm isn't available
       const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4';
@@ -377,7 +373,7 @@ export function PostSecretBar({ onPosted }: { onPosted: () => void }) {
                      ) : (
                        <Mic className="w-8 h-8 mb-1" />
                      )}
-                     <span className="font-black tracking-widest text-xs uppercase">{countdown !== null ? "Starting..." : isRecording ? "Recording... (Tap to Stop)" : "Tap to Record (Walkie-Talkie)"}</span>
+                     <span className="font-black tracking-widest text-xs uppercase">{countdown !== null ? "Starting..." : isRecording ? "Recording... (Tap to Stop)" : "Tap to Record (Lo-Fi Whisper)"}</span>
                    </button>
                  ) : (
                    <div className="flex flex-col items-center justify-center w-full h-full bg-[#55efc4] text-[#111] overflow-hidden">

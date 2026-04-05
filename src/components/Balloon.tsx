@@ -109,6 +109,7 @@ export function BalloonVessel({ secret, placement, onClick }: Props) {
       onClick={() => onClick(secret)}
       style={{
         left: `${laneLeft}%`,
+        transform: 'translateX(-50%)',
         animationName: `balloon-rise-${p.riseVariant}`,
         animationDuration: `${riseDurationSecs / p.speedFactor}s`,
         animationTimingFunction: p.riseVariant === 2 ? 'ease-in-out' : 'linear',

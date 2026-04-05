@@ -9,6 +9,7 @@ import { AnimatePresence } from "framer-motion";
 import { analyzeMood, censorMessage } from "@/lib/mood";
 import { ShieldCheck, ShieldOff } from "lucide-react";
 import { parseSecretPayload } from "@/lib/parseSecret";
+import { Preloader } from "./Preloader";
 
 export function BalloonField() {
   const [secrets, setSecrets] = useState<Secret[]>([]);
@@ -106,15 +107,15 @@ export function BalloonField() {
     if (secrets.length === 0) return [];
     
     // 1. Calculate capacity based on screen width
-    // We aim for roughly 1 lane every 140px on mobile, 180px on desktop
+    // On mobile we want more virtual columns to create a "random" spread feel
     const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    const laneWidthPx = isMobile ? 160 : 180;
-    const COLS = Math.max(isMobile ? 2 : 5, Math.floor(width / laneWidthPx));
+    const laneWidthPx = isMobile ? 90 : 180; // Smaller gap on mobile for perceived randomness
+    const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / laneWidthPx));
     
-    // Increase cap so more balloons actually spawn over time
+    // Increase cap slightly on mobile
     const maxBalloons = isMobile 
-      ? Math.min(secrets.length, 24) 
-      : Math.min(secrets.length, COLS * 4); 
+      ? Math.min(secrets.length, 12) 
+      : Math.min(secrets.length, COLS * 5); 
     
     const visibleSecrets = secrets.slice(0, maxBalloons);
     const mains: Secret[] = [];
@@ -140,8 +141,6 @@ export function BalloonField() {
     if (n === 0) return [];
 
     // STABLE POSITIONING SYSTEM
-    // We derive lane and depth from the secret's own data to ensure stability.
-    // mains is NEWEST-first (index 0 is latest).
     const mainsWithHashes = mains.map(s => ({
       s,
       uhash: Math.abs(s.id.split("").reduce((a, c) => (a * 29 + c.charCodeAt(0)) | 0, 0)),
@@ -151,53 +150,42 @@ export function BalloonField() {
 
     for (let i = 0; i < n; i++) {
         const { s, uhash } = mainsWithHashes[i];
-        const payload = parseSecretPayload(s.message);
         
-        // Stable lane assignment based on hash
-        const laneIdx = uhash % COLS;
+        // ── GUARANTEED SPREAD ──
+        // Instead of hash-based lane (which can cluster), we use round-robin
+        // to ENSURE that balloons occupy all screen area evenly.
+        const laneIdx = (i + (uhash % COLS)) % COLS;
         
-        // Stable depth: how many balloons in this same lane are OLDER than me?
-        // Since mains is newest-first, older balloons are at indices > i.
-        const olderInSameLane = mainsWithHashes.slice(i + 1).filter(m => {
-          const m_uhash = m.uhash;
-          return (m_uhash % COLS) === laneIdx;
-        }).length;
-
-        const minX = isMobile ? 8 : 5;
-        const maxX = isMobile ? 92 : 95;
-        const laneWidth = (maxX - minX) / COLS;
-
-        // Horizontal: Stable jitter
-        const jitterFactor = isMobile ? 0.15 : 0.45;
-        const jitter = ((uhash % 100) / 100 - 0.5) * laneWidth * jitterFactor;
-        const finalLeft = minX + (laneIdx * laneWidth) + (laneWidth / 2) + jitter;
+        // ── EDGE-PERFECT TOUCHING (Center Logic) ──
+        // To touch the edge without cutting, center must be at Exactly 1 Radius.
+        // For mobile, radius is ~14%. So leftmost lane center @ 14, rightmost lane center @ 86.
+        const minX = isMobile ? 14 : 5;
+        const maxX = isMobile ? 86 : 95;
+        
+        const totalLaneSpan = maxX - minX;
+        const spacing = totalLaneSpan / Math.max(1, COLS - 1);
+        
+        // Horizontal: Base center + stable jitter
+        const jitterFactor = isMobile ? 0.3 : 0.45;
+        const jitter = ((uhash % 100) / 100 - 0.5) * spacing * jitterFactor;
+        const finalLeft = minX + (laneIdx * spacing) + jitter;
 
         const buoyancyFactor = Math.max(0.6, Math.min(1.4, s.buoyancy / 100));
-        // Slowing down the base duration for more visibility (especially on mobile)
-        const baseDuration = isMobile ? 18 : 16;
-        const riseDurationSecs = (baseDuration + (uhash % 10)) / buoyancyFactor;
+        const baseDuration = isMobile ? 22 : 18; 
+        const riseDurationSecs = (baseDuration + (uhash % 18)) / buoyancyFactor;
 
-        // Safe depth stagger
-        const safeDepthStagger = isMobile
-          ? riseDurationSecs * (200 / 700) 
-          : riseDurationSecs * (200 / 900);
-          
-        const laneStagger = laneIdx * 0.4;
-        const depthStagger = olderInSameLane * safeDepthStagger;
+        // Timing: Tighter stagger to ensure density (at least 5 on screen)
+        const indexStagger = i * (isMobile ? 0.95 : 0.8);
+        const randomOffset = ((uhash % 80) / 10); // 0 to 8s
         
-        // SMART MOBILE LAUNCH: Steady sets of balloons
-        // On mobile, we launch in smaller sets (roughly 2 balloons at a time)
-        // by grouping them into "depth waves".
-        const mobileSetDelay = isMobile ? (Math.floor(i / 2) * 5) : 0;
-        
-        const randomOffset = ((uhash % 30) / 10); 
-        const riseDelaySecs = laneStagger + depthStagger + randomOffset + mobileSetDelay;
+        const riseDelaySecs = indexStagger + randomOffset;
 
         // Analyze mood
+        const payload = parseSecretPayload(s.message);
         const { parsedMood, intensity } = analyzeMood(payload.text);
         const threadReplies = repliesMap.get(s.id) || [];
 
-        const p = {
+        placements.push({
             secret: s,
             replies: threadReplies,
             laneLeft: finalLeft,
@@ -205,9 +193,7 @@ export function BalloonField() {
             riseDurationSecs,
             parsedMood,
             intensity
-        };
-        
-        placements.push(p);
+        });
     }
     
     return placements;
@@ -230,6 +216,10 @@ export function BalloonField() {
   // ── Render ────────────────────────────────────────────
   return (
     <div className="absolute inset-0 w-full h-full overflow-hidden">
+      <AnimatePresence>
+        {loading && <Preloader key="sky-loader" onComplete={() => setLoading(false)} />}
+      </AnimatePresence>
+
       {/* Halftone overlay — comic printing feel */}
       <div className="halftone absolute inset-0 z-0 pointer-events-none" />
 
@@ -247,17 +237,6 @@ export function BalloonField() {
 
       {/* Main balloon canvas */}
       <div className="absolute inset-0 z-10 w-full h-[100dvh] overflow-hidden">
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div
-              className="px-6 py-3 border-[4px] border-[#111] font-black uppercase tracking-widest text-[#111] rounded-2xl rotate-1 shadow-[6px_6px_0px_#111]"
-              style={{ background: "#ffe66d" }}
-            >
-              Catching balloons...
-            </div>
-          </div>
-        )}
-
         {!loading && dbError && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div
@@ -299,13 +278,14 @@ export function BalloonField() {
       {/* Modal overlay */}
       <AnimatePresence>
         {(() => {
+          if (!selected) return null;
           // Find the LATEST version of the selected secret to ensure voting counts stay fresh
-          const activeSecret = selected ? secrets.find(s => s.id === selected.id) || selected : null;
+          const activeSecret = secrets.find(s => s.id === selected.id) || selected;
           
-          return activeSecret && (
+          return (
             <div className="absolute inset-0 z-[300]">
               <SecretModal 
-                secret={activeSecret} 
+                secret={activeSecret as Secret} 
                 replies={selectedReplies}
                 onClose={handleClose} 
                 onBalloonPopped={fetchSecrets} 

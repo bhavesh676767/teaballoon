@@ -6,7 +6,7 @@ import { Secret } from "@/lib/supabase";
 import { getMoodStyle } from "@/lib/moodConfig";
 import { analyzeMood } from "@/lib/mood";
 import { parseSecretPayload } from "@/lib/parseSecret";
-import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio, Heart } from "lucide-react";
+import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio, Heart, Maximize2, Minimize2 } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
 
 const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
@@ -82,7 +82,7 @@ function ReplyCard({ rep, idx }: { rep: Secret; idx: number }) {
       const res = await fetch("/api/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ secretId: rep.id, delta: 1, deviceId: getDeviceId() + "_reply" }),
+        body: JSON.stringify({ secretId: rep.id, delta: 1, deviceId: getDeviceId() + "_r_" + rep.id }),
       });
       if (!res.ok) {
         // Rollback silently (don't punish UX for a network blip)
@@ -197,6 +197,7 @@ export function SecretModal({
   });
   const [tooltip, setTooltip] = useState<string | null>(null);
   const [isPopping, setIsPopping] = useState(false);
+  const [msgExpanded, setMsgExpanded] = useState(false);
 
   // -- Admin states
   const [adminStep, setAdminStep] = useState(0);
@@ -457,7 +458,7 @@ export function SecretModal({
             </span>
           </div>
 
-          {/* Secret Message Box - Fixed Height & Scrollable */}
+          {/* Secret Message Box */}
           <div className="relative mt-2">
             <div className="absolute -top-[12px] left-6 w-5 h-5 bg-white border-l-[3px] border-t-[3px] border-[#111] transform rotate-45 z-10" />
             
@@ -467,7 +468,7 @@ export function SecretModal({
               className="bg-white border-[3px] border-[#111] p-5 rounded-3xl relative z-0 overflow-y-auto custom-scrollbar"
               style={{ 
                 boxShadow: "inset 4px 4px 0 rgba(0,0,0,0.05)",
-                maxHeight: "30vh", // Prevents overlapping with buttons
+                maxHeight: "30vh",
                 minHeight: "100px"
               }}
             >
@@ -475,7 +476,7 @@ export function SecretModal({
                 className="text-[1.8rem] leading-[1.3] font-bold break-words text-[#111]"
                 style={{ fontFamily: "var(--font-caveat)" }}
               >
-                "{payload.text}"
+                &quot;{payload.text}&quot;
               </p>
               
               {payload.doodle && (
@@ -496,7 +497,94 @@ export function SecretModal({
                 </div>
               )}
             </div>
+
+            {/* Expand button — bottom-right corner of the message box */}
+            <button
+              onClick={() => setMsgExpanded(true)}
+              className="absolute bottom-2 right-2 z-20 flex items-center gap-1 px-2 py-1 bg-white border-[2px] border-[#111] rounded-xl font-black text-[9px] uppercase tracking-wide shadow-[2px_2px_0_#111] hover:bg-[#ffe66d] hover:scale-105 transition-all"
+            >
+              <Maximize2 className="w-3 h-3" strokeWidth={3} />
+              Expand
+            </button>
           </div>
+
+          {/* ── Full-screen message expand overlay ── */}
+          <AnimatePresence>
+            {msgExpanded && (
+              <motion.div
+                key="msg-expand"
+                initial={{ opacity: 0, scale: 0.92 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                className="fixed inset-0 z-[400] flex items-center justify-center p-4"
+              >
+                {/* Backdrop */}
+                <div
+                  className="absolute inset-0 bg-black/75 backdrop-blur-sm"
+                  onClick={() => setMsgExpanded(false)}
+                />
+
+                {/* Expanded card */}
+                <div
+                  className="relative w-full max-w-lg bg-white border-[4px] border-[#111] rounded-3xl p-6 overflow-y-auto custom-scrollbar z-10"
+                  style={{
+                    maxHeight: "90dvh",
+                    boxShadow: "8px 8px 0 #111"
+                  }}
+                >
+                  {/* Mood tag */}
+                  <div
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-2xl border-[3px] font-black text-xs uppercase mb-4 -rotate-1"
+                    style={{
+                      background: moodStyle.fill,
+                      color: moodStyle.fontColor || '#111',
+                      borderColor: moodStyle.fontColor || '#111',
+                      boxShadow: `3px 3px 0 ${moodStyle.fontColor || '#111'}`
+                    }}
+                  >
+                    <moodStyle.Icon className="w-4 h-4" style={{ color: moodStyle.fontColor || '#111' }} />
+                    {moodStyle.label}
+                  </div>
+
+                  {/* Full text — no max-height cap */}
+                  <p
+                    className="text-[2rem] leading-[1.35] font-bold break-words text-[#111] mb-4"
+                    style={{ fontFamily: "var(--font-caveat)" }}
+                  >
+                    &quot;{payload.text}&quot;
+                  </p>
+
+                  {payload.doodle && (
+                    <div className="flex justify-center my-4">
+                      <img src={payload.doodle} className="max-w-full border-[3px] border-[#111] rounded-2xl bg-white shadow-[4px_4px_0_#111]" alt="Secret Doodle" />
+                    </div>
+                  )}
+
+                  {payload.audio && (
+                    <div className="flex flex-col items-center mt-4 p-3 bg-[#111] rounded-xl text-white shadow-[4px_4px_0_#55efc4]">
+                      <span className="font-black text-xs tracking-widest uppercase mb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 flex items-center justify-center bg-[#55efc4] text-[#111] rounded-lg">
+                          <Radio className="w-3.5 h-3.5" strokeWidth={3} />
+                        </span>
+                        Intercepted Transmission
+                      </span>
+                      <audio controls src={payload.audio} className="w-full h-8" style={{ filter: 'invert(1)' }} />
+                    </div>
+                  )}
+
+                  {/* Close / collapse button */}
+                  <button
+                    onClick={() => setMsgExpanded(false)}
+                    className="absolute top-3 right-3 flex items-center gap-1 px-3 py-1.5 bg-[#111] text-white border-[2px] border-[#111] rounded-xl font-black text-[10px] uppercase tracking-wide shadow-[2px_2px_0_#555] hover:bg-[#ff6b6b] hover:scale-105 transition-all"
+                  >
+                    <Minimize2 className="w-3 h-3" strokeWidth={3} />
+                    Close
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* ── Reply Thread (outside the message box) ── */}
           {repliesList.length > 0 && (

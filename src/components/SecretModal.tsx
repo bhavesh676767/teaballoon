@@ -6,7 +6,7 @@ import { Secret } from "@/lib/supabase";
 import { getMoodStyle } from "@/lib/moodConfig";
 import { analyzeMood } from "@/lib/mood";
 import { parseSecretPayload } from "@/lib/parseSecret";
-import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio } from "lucide-react";
+import { ArrowBigUp, ArrowBigDown, MessageCircle, Send, Image as ImageIcon, Search, X, Radio, Heart } from "lucide-react";
 import { getDeviceId } from "@/lib/utils";
 
 const GIPHY_API_KEY = process.env.NEXT_PUBLIC_GIPHY_API_KEY || "";
@@ -49,6 +49,98 @@ const saveLocalVote = (secretId: string, type: "up" | "down") => {
     localStorage.setItem("tb_votes", JSON.stringify(votes));
   } catch {}
 };
+
+// ── Reply like helpers (separate localStorage key from main votes) ──
+const getLocalReplyLikes = (): Record<string, true> => {
+  if (typeof window === "undefined") return {};
+  try { return JSON.parse(localStorage.getItem("tb_reply_likes") || "{}"); } catch { return {}; }
+};
+
+const saveLocalReplyLike = (replyId: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    const likes = getLocalReplyLikes();
+    likes[replyId] = true;
+    localStorage.setItem("tb_reply_likes", JSON.stringify(likes));
+  } catch {}
+};
+
+// ── Per-reply like button ──────────────────────────────────────────────────
+function ReplyCard({ rep, idx }: { rep: Secret; idx: number }) {
+  const r = parseSecretPayload(rep.message);
+  const [liked, setLiked] = useState<boolean>(() => !!getLocalReplyLikes()[rep.id]);
+  const [likeCount, setLikeCount] = useState(rep.votes || 0);
+  const [liking, setLiking] = useState(false);
+
+  const handleLike = async () => {
+    if (liked || liking) return;
+    setLiked(true);
+    setLikeCount(c => c + 1);
+    saveLocalReplyLike(rep.id);
+    setLiking(true);
+    try {
+      const res = await fetch("/api/vote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secretId: rep.id, delta: 1, deviceId: getDeviceId() + "_reply" }),
+      });
+      if (!res.ok) {
+        // Rollback silently (don't punish UX for a network blip)
+        setLiked(false);
+        setLikeCount(c => c - 1);
+        const likes = getLocalReplyLikes();
+        delete likes[rep.id];
+        localStorage.setItem("tb_reply_likes", JSON.stringify(likes));
+      }
+    } catch {
+      setLiked(false);
+      setLikeCount(c => c - 1);
+    } finally {
+      setLiking(false);
+    }
+  };
+
+  return (
+    <motion.div
+      key={rep.id}
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: idx * 0.05 }}
+      className="relative pl-4"
+    >
+      {/* Vertical thread line */}
+      <div className="absolute left-[7px] top-0 bottom-0 w-[2px] bg-gray-200" />
+      {/* Dot on the timeline */}
+      <div className="absolute left-[3px] top-3 w-[10px] h-[10px] rounded-full bg-[#ffe66d] border-[2px] border-[#111] z-10" />
+
+      <div className="ml-3 bg-[#fcf8e3] border-[2px] border-[#111] p-3 rounded-2xl shadow-[2px_2px_0_rgba(0,0,0,0.06)]">
+        <p className="font-bold text-[#111] break-words" style={{ fontFamily: "var(--font-caveat)", fontSize: "1.15rem", lineHeight: 1.3 }}>
+          {r.text}
+        </p>
+        {r.gif && (
+          <img src={r.gif} className="mt-2 h-20 w-auto rounded-lg border border-[#111] bg-white" alt="gif" />
+        )}
+        {/* Footer: author label + like button */}
+        <div className="mt-2 flex items-center justify-between">
+          <div className="text-[9px] text-gray-400 font-black uppercase tracking-wider">Anonymous Traveler</div>
+          <button
+            onClick={handleLike}
+            disabled={liked || liking}
+            className={`flex items-center gap-1 px-2 py-1 rounded-full border-[2px] border-[#111] text-[10px] font-black transition-all ${
+              liked
+                ? "bg-[#ff6b6b] text-white scale-110 shadow-[2px_2px_0_#111]"
+                : "bg-white text-gray-500 hover:bg-red-50 hover:text-[#ff6b6b] shadow-[2px_2px_0_#111] hover:scale-105"
+            }`}
+            style={{ cursor: liked ? "default" : "pointer" }}
+          >
+            <Heart className={`w-3 h-3 transition-all ${liked ? "fill-white" : ""}`} strokeWidth={2.5} />
+            {likeCount > 0 && <span>{likeCount}</span>}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
 
 // Recognises the Device for vote protection
 export function SecretModal({ 
@@ -416,33 +508,9 @@ export function SecretModal({
                 </span>
                 <div className="h-[2px] flex-grow bg-gray-100" />
               </div>
-              {repliesList.map((rep, idx) => {
-                const r = parseSecretPayload(rep.message);
-                return (
-                  <motion.div
-                    key={rep.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="relative pl-4"
-                  >
-                    {/* Vertical thread line */}
-                    <div className="absolute left-[7px] top-0 bottom-0 w-[2px] bg-gray-200" />
-                    {/* Dot on the timeline */}
-                    <div className="absolute left-[3px] top-3 w-[10px] h-[10px] rounded-full bg-[#ffe66d] border-[2px] border-[#111] z-10" />
-
-                    <div className="ml-3 bg-[#fcf8e3] border-[2px] border-[#111] p-3 rounded-2xl shadow-[2px_2px_0_rgba(0,0,0,0.06)]">
-                      <p className="font-bold text-[#111] break-words" style={{ fontFamily: "var(--font-caveat)", fontSize: "1.15rem", lineHeight: 1.3 }}>
-                        {r.text}
-                      </p>
-                      {r.gif && (
-                        <img src={r.gif} className="mt-2 h-20 w-auto rounded-lg border border-[#111] bg-white" alt="gif" />
-                      )}
-                      <div className="mt-1.5 text-[9px] text-gray-400 font-black uppercase tracking-wider">Anonymous Traveler</div>
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {repliesList.map((rep, idx) => (
+                <ReplyCard key={rep.id} rep={rep} idx={idx} />
+              ))}
             </div>
           )}
 

@@ -107,35 +107,36 @@ export function BalloonField() {
     if (secrets.length === 0) return [];
     
     // 1. Calculate capacity based on screen width
-    // On mobile we want more virtual columns to create a "random" spread feel
     const width = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    const laneWidthPx = isMobile ? 90 : 180; // Smaller gap on mobile for perceived randomness
+    const laneWidthPx = isMobile ? 90 : 180;
     const COLS = Math.max(isMobile ? 3 : 5, Math.floor(width / laneWidthPx));
-    
-    // Increase cap slightly on mobile
     const maxBalloons = isMobile 
-      ? Math.min(secrets.length, 12) 
-      : Math.min(secrets.length, COLS * 5); 
-    
-    const visibleSecrets = secrets.slice(0, maxBalloons);
-    const mains: Secret[] = [];
+      ? Math.min(12, secrets.length) 
+      : Math.min(COLS * 5, secrets.length);
+
+    // ── CRITICAL FIX ──
+    // First pass: categorize ALL secrets into mains vs replies.
+    // We must do this BEFORE slicing, because secrets are ordered newest-first
+    // and many newest entries are replies — slicing first starves us of mains.
+    const allMains: Secret[] = [];
     const repliesMap = new Map<string, Secret[]>();
 
-    visibleSecrets.forEach((s_original: Secret) => {
-       const s = { ...s_original };
-       const payload = parseSecretPayload(s.message);
-       
-       // Global Censorship check
-       payload.text = censorMessage(payload.text, censorEnabled);
-       s.message = JSON.stringify(payload);
+    secrets.forEach((s_original: Secret) => {
+      const s = { ...s_original };
+      const payload = parseSecretPayload(s.message);
+      payload.text = censorMessage(payload.text, censorEnabled);
+      s.message = JSON.stringify(payload);
 
-       if (payload.replyTo) {
-          if (!repliesMap.has(payload.replyTo)) repliesMap.set(payload.replyTo, []);
-          repliesMap.get(payload.replyTo)!.push(s);
-       } else {
-          mains.push(s);
-       }
+      if (payload.replyTo) {
+        if (!repliesMap.has(payload.replyTo)) repliesMap.set(payload.replyTo, []);
+        repliesMap.get(payload.replyTo)!.push(s);
+      } else {
+        allMains.push(s);
+      }
     });
+
+    // Second pass: cap only the mains to maxBalloons — guaranteed balloon count
+    const mains = allMains.slice(0, maxBalloons);
 
     const n = mains.length;
     if (n === 0) return [];
